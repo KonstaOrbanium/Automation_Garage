@@ -1,0 +1,38 @@
+{
+	"folders": [
+		{
+			"name": "TestMIK2",
+			"path": "E:/MIKProjects/TestMIK2"
+		},
+		{
+			"name": "FR",
+			"path": "."
+		}
+	],
+	"settings": {
+		"cquery.cacheDirectory": "${workspaceFolder}/.vscode/cquery_cached_index/",
+		"files.associations": {
+			"mik32_memory_map.h": "c",
+			"mik32_hal.h": "c",
+			"mik32_hal_gpio.h": "c",
+			"mik32_hal_def.h": "c",
+			"mik32_hal_i2c.h": "c",
+			"mik32_hal_usart.h": "c",
+			"mik32_hal_pcc.h": "c",
+			"power_manager.h": "c",
+			"wakeup.h": "c",
+			"timers.h": "c",
+			"mik32_hal_spifi_w25.h": "c",
+			"mik32_hal_irq.h": "c",
+			"uart_lib.h": "c",
+			"mik32_hal_spifi.h": "c",
+			"xprintf.h": "c",
+			"modbus.h": "c",
+			"freertosconfig.h": "c",
+			"type_traits": "c",
+			"semphr.h": "c",
+			"freertos.h": "c",
+			"task.h": "c"
+		}
+	}
+}

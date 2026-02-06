@@ -1,0 +1,2 @@
+buildTools.path=${eclipse_home}\\..\\build-tools\\bin
+eclipse.preferences.version=1
