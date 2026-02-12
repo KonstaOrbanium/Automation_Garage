@@ -46,7 +46,9 @@
 #define _PWM_PIN_2 GPIO_PIN_2
 #define _PWM_PIN_3 GPIO_PIN_3
 
-extern modbusHandler_t *mHandlers[MAX_M_HANDLERS];
+
+
+
 SemaphoreHandle_t xButtonSemaphore;
 __attribute__((section(".ram_text"))) void Startup_SPIFI_Config();
 // Структура для параметров задачи blink_task.
@@ -75,10 +77,11 @@ GPIOs_TypeDef flashlights[] = {
 };
 
 // Задача мигания светодиодом.
-static void blink_task(void *pvParameters)
+void blink_task(void *pvParameters)
 {
 	const led_config_t *cfg = (const led_config_t *)pvParameters;
-	while (1)
+	ModbusInit(mHandlers[0]);
+	for (;;)
 	{
 		HAL_GPIO_TogglePin(cfg->port, cfg->pin);
 		vTaskDelay(pdMS_TO_TICKS(cfg->interval));

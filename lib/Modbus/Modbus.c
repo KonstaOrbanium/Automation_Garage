@@ -70,8 +70,8 @@ static int8_t process_FC5(modbusHandler_t *modH);
 static int8_t process_FC6(modbusHandler_t *modH);
 static int8_t process_FC15(modbusHandler_t *modH);
 static int8_t process_FC16(modbusHandler_t *modH);
-static void vTimerCallbackT35(TimerHandle_t *pxTimer);
-static void vTimerCallbackTimeout(TimerHandle_t *pxTimer);
+// static void vTimerCallbackT35(TimerHandle_t *pxTimer);
+// static void vTimerCallbackTimeout(TimerHandle_t *pxTimer);
 
 //static int16_t getRxBuffer(modbusHandler_t *modH);
 static int8_t SendQuery(modbusHandler_t *modH, modbus_t telegram);
@@ -219,12 +219,12 @@ void ModbusInit(modbusHandler_t *modH)
                 }
 #endif
 
-            modH->xTimerTimeout = xTimerCreate("xTimerTimeout",  // Just a text name, not used by the kernel.
-                    modH->u16timeOut,     		// The timer period in ticks.
-                    pdFALSE,         // The timers will auto-reload themselves when they expire.
-                    (void*) modH->xTimerTimeout,     // Assign each timer a unique id equal to its array index.
-                    (TimerCallbackFunction_t) vTimerCallbackTimeout  // Each timer calls the same callback when it expires.
-                    );
+            // modH->xTimerTimeout = xTimerCreate("xTimerTimeout",  // Just a text name, not used by the kernel.
+            //         modH->u16timeOut,     		// The timer period in ticks.
+            //         pdFALSE,         // The timers will auto-reload themselves when they expire.
+            //         (void*) modH->xTimerTimeout,     // Assign each timer a unique id equal to its array index.
+            //         (TimerCallbackFunction_t) vTimerCallbackTimeout  // Each timer calls the same callback when it expires.
+            //         );
 
             if (modH->xTimerTimeout == NULL)
             {
@@ -249,12 +249,12 @@ void ModbusInit(modbusHandler_t *modH)
             while (1); //Error creating Modbus task, check heap and stack size
         }
 
-        modH->xTimerT35 = xTimerCreate("TimerT35",         // Just a text name, not used by the kernel.
-                T35,     // The timer period in ticks.
-                pdFALSE,         // The timers will auto-reload themselves when they expire.
-                (void*) modH->xTimerT35,     // Assign each timer a unique id equal to its array index.
-                (TimerCallbackFunction_t) vTimerCallbackT35     // Each timer calls the same callback when it expires.
-                );
+        // modH->xTimerT35 = xTimerCreate("TimerT35",         // Just a text name, not used by the kernel.
+        //         T35,     // The timer period in ticks.
+        //         pdFALSE,         // The timers will auto-reload themselves when they expire.
+        //         (void*) modH->xTimerT35,     // Assign each timer a unique id equal to its array index.
+        //         (TimerCallbackFunction_t) vTimerCallbackT35     // Each timer calls the same callback when it expires.
+        //         );
         if (modH->xTimerT35 == NULL)
         {
             while (1); //Error creating the timer, check heap and stack size
@@ -344,7 +344,6 @@ void ModbusStart(modbusHandler_t *modH)
 
         }
 
-
 #if ENABLE_TCP == 1
 
 #endif
@@ -370,41 +369,41 @@ void ModbusStartCDC(modbusHandler_t * modH)
 }
 #endif
 
-void vTimerCallbackT35(TimerHandle_t *pxTimer)
-{
-    //Notify that a stream has just arrived
-    int i;
-    //TimerHandle_t aux;
-    for (i = 0; i < numberHandlers; i++)
-    {
+// void vTimerCallbackT35(TimerHandle_t *pxTimer)
+// {
+//     //Notify that a stream has just arrived
+//     int i;
+//     //TimerHandle_t aux;
+//     for (i = 0; i < numberHandlers; i++)
+//     {
 
-        if ((TimerHandle_t*) mHandlers[i]->xTimerT35 == pxTimer)
-        {
-            if (mHandlers[i]->uModbusType == MB_MASTER)
-            {
-                xTimerStop(mHandlers[i]->xTimerTimeout, 0);
-            }
-            xTaskNotify(mHandlers[i]->myTaskModbusAHandle, 0, eSetValueWithOverwrite);
-        }
-    }
-}
+//         if ((TimerHandle_t*) mHandlers[i]->xTimerT35 == pxTimer)
+//         {
+//             if (mHandlers[i]->uModbusType == MB_MASTER)
+//             {
+//                 xTimerStop(mHandlers[i]->xTimerTimeout, 0);
+//             }
+//             xTaskNotify(mHandlers[i]->myTaskModbusAHandle, 0, eSetValueWithOverwrite);
+//         }
+//     }
+// }
 
-void vTimerCallbackTimeout(TimerHandle_t *pxTimer)
-{
-    //Notify that a stream has just arrived
-    int i;
-    //TimerHandle_t aux;
-    for (i = 0; i < numberHandlers; i++)
-    {
+// void vTimerCallbackTimeout(TimerHandle_t *pxTimer)
+// {
+//     //Notify that a stream has just arrived
+//     int i;
+//     //TimerHandle_t aux;
+//     for (i = 0; i < numberHandlers; i++)
+//     {
 
-        if ((TimerHandle_t*) mHandlers[i]->xTimerTimeout == pxTimer)
-        {
-            xTaskNotify(mHandlers[i]->myTaskModbusAHandle, ERR_TIME_OUT, eSetValueWithOverwrite);
-        }
+//         if ((TimerHandle_t*) mHandlers[i]->xTimerTimeout == pxTimer)
+//         {
+//             xTaskNotify(mHandlers[i]->myTaskModbusAHandle, ERR_TIME_OUT, eSetValueWithOverwrite);
+//         }
 
-    }
+//     }
 
-}
+// }
 
 #if ENABLE_TCP ==1
 
@@ -715,7 +714,7 @@ void ModbusQueryInject(modbusHandler_t *modH, modbus_t telegram)
 {
     //Add the telegram to the TX head Queue of Modbus
     xQueueReset(modH->QueueTelegramHandle);
-    telegram.u32CurrentTask = (uint32_t*) osThreadGetId();
+    //telegram.u32CurrentTask = (uint32_t*) osThreadGetId();
     xQueueSendToFront(modH->QueueTelegramHandle, &telegram, 0);
 }
 
@@ -1204,7 +1203,7 @@ int16_t getRxBuffer(modbusHandler_t *modH)
 
     if (modH->xTypeHW == USART_HW)
     {
-        HAL_UART_AbortReceive_IT(modH->port); // disable interrupts to avoid race conditions on serial port
+        //HAL_UART_AbortReceive_IT(modH->port); // disable interrupts to avoid race conditions on serial port
     }
 
     if (modH->xBufferRX.overflow)
@@ -1221,7 +1220,7 @@ int16_t getRxBuffer(modbusHandler_t *modH)
 
     if (modH->xTypeHW == USART_HW)
     {
-        HAL_UART_Receive_IT(modH->port, &modH->dataRX, 1);
+        //HAL_UART_Receive_IT(modH->port, &modH->dataRX, 1);
     }
 
     return i16result;
@@ -1456,7 +1455,8 @@ static void sendTxBuffer(modbusHandler_t *modH)
     	{
 #endif
         // transfer buffer to serial line IT
-        //    HAL_UART_Transmit_IT(modH->port, modH->u8Buffer, modH->u8BufferSize)
+        //    HAL_UART_Transmit_IT(modH->port, modH->u8Buffer, modH->u8BufferSize);
+
         HAL_USART_Write(&husart1, (char*)mHandlers[numberHandlers]->u8Buffer, modH->u8BufferSize + 2, 300);
 #if ENABLE_USART_DMA == 1
     	}
@@ -1858,7 +1858,7 @@ void trap_handler() {
     if (EPIC_CHECK_UART_1()) {
         /* Прием данных: запись в буфер */
         if (HAL_USART_RXNE_ReadFlag(&husart1)) {
-            mHandlers[numberHandlers]->u8Buffer[bufPointer] = HAL_USART_ReadByte(&husart1);
+            mHandlers[0]->u8Buffer[bufPointer] = HAL_USART_ReadByte(&husart1);
             if (bufPointer >= Modbus_FrameCount) {
                 bufPointer = 0;
                 uint32_t ulNotificationValue = 1;
