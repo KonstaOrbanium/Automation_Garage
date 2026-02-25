@@ -1,5 +1,6 @@
-#include "mik32_hal_irq.h"
+
 #include "mik32_hal_spifi_w25.h"
+#include "mik32_hal_timer32.h"
 #include "FreeRTOS.h"
 #include "task.h"
 #include "semphr.h"
@@ -48,7 +49,7 @@
 
 
 
-
+extern modbusHandler_t mHandle;
 SemaphoreHandle_t xButtonSemaphore;
 __attribute__((section(".ram_text"))) void Startup_SPIFI_Config();
 // Структура для параметров задачи blink_task.
@@ -80,48 +81,29 @@ GPIOs_TypeDef flashlights[] = {
 void blink_task(void *pvParameters)
 {
 	const led_config_t *cfg = (const led_config_t *)pvParameters;
-	ModbusInit(mHandlers[0]);
-	for (;;)
-	{
-		HAL_GPIO_TogglePin(cfg->port, cfg->pin);
-		vTaskDelay(pdMS_TO_TICKS(cfg->interval));
-	}
+
+	ModbusInit(&mHandle);
+
+	// for (;;)
+	// {
+	// 	L_GPIO_TogglePin(cfg->port, cfg->pin);
+		
+      
+    //         HAL_GPIO_TogglePin(GPIO_1, GPIO_PIN_3);
+    //         HAL_GPIO_TogglePin(GPIO_0, GPIO_PIN_3);
+    //         vTaskDelay(pdMS_TO_TICKS(1000));
+			
+	// }
+	vTaskDelete((TaskHandle_t)NULL);
 }
 
-// Задача с семафором с таймаутом.
-void blink_button_task(void *pvParameters)
-{
-	const led_config_t *cfg = (const led_config_t *)pvParameters;
-	while (1)
-	{
-		// Пытаемся взять семафор с таймаутом
-		BaseType_t result = xSemaphoreTake(xButtonSemaphore, pdMS_TO_TICKS(100));
-
-		if (result == pdTRUE)
-		{
-			// Семафор получен - мигаем быстро несколько раз.
-			for (int i = 0; i < 6; i++)
-			{
-				HAL_GPIO_TogglePin(cfg->port, cfg->pin);
-				vTaskDelay(pdMS_TO_TICKS(100));
-			}
-		}
-		else
-		{
-			// Таймаут - обычное мигание.
-			HAL_GPIO_TogglePin(cfg->port, cfg->pin);
-		}
-
-		vTaskDelay(pdMS_TO_TICKS(cfg->interval));
-	}
-}
 
 int main()
 {
 	HAL_Init();
 
 	SystemClock_Config();
-
+	// Timer32_1_Init();
 	GPIO_Init();
 
 	USART_Init();
@@ -131,12 +113,7 @@ int main()
 	//Startup_SPIFI_Config();		///< Для работы с SPIFI
 	//Мигаем несколько раз для индикации успешной инициализации.
 
-    for (uint32_t i = 0; i < 6; i++)
-    {
-        HAL_GPIO_TogglePin(LED1_PORT, LED1_PIN);
-		HAL_GPIO_TogglePin(LED2_PORT, LED2_PIN);
-        HAL_DelayMs(100);
-    }
+ 
 	// Разрешить прерывания по уровню для линии EPIC GPIO_IRQ.
 
 	HAL_GPIO_ClearInterrupts();
@@ -149,16 +126,10 @@ int main()
 	xTaskCreate(blink_task,
 				"LED1",
 				128,
-				(void *)&((led_config_t){.port = LED1_PORT, .pin = LED1_PIN, .interval = 500}),
+				NULL,
 				tskIDLE_PRIORITY + 1 ,
 				NULL);
 
-	xTaskCreate(blink_button_task,
-				"LED2",
-				128,
-				(void *)&((led_config_t){.port = LED2_PORT, .pin = LED2_PIN, .interval = 250}),
-				tskIDLE_PRIORITY + 1,
-				NULL);
 	vTaskStartScheduler();
 }
 
@@ -243,6 +214,11 @@ RAM_ATTR void raw_trap_handler()
 	freertos_risc_v_trap_handler();
 }
 
+USART_HandleTypeDef husart1;
+uint8_t bufPointer;
+const uint8_t Modbus_FrameCount = 8;
+#define BUFFER_LENGTH 50
+
 // Обработчик прерываний.
 RAM_ATTR void freertos_risc_v_application_interrupt_handler(void)
 {
@@ -257,14 +233,34 @@ RAM_ATTR void freertos_risc_v_application_interrupt_handler(void)
 		}
 		HAL_GPIO_ClearInterrupts();
 	}
-
+ 	if (EPIC_CHECK_UART_1()) {
+	/* Прием данных: запись в буфер */
+		if (HAL_USART_RXNE_ReadFlag(&husart1)) {
+			BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+			 
+			mHandlers[0]->u8RxBuffer[bufPointer] = HAL_USART_ReadByte(&husart1);
+			if (bufPointer >= Modbus_FrameCount) {
+				bufPointer = 0;
+				uint8_t ulNotificationValue = 0;
+				
+				
+				if (mHandlers[0]->queueTaskSlaveHandle) {
+						
+					xQueueSendToBackFromISR(mHandlers[0]->queueTaskSlaveHandle, &ulNotificationValue, &xHigherPriorityTaskWoken);
+					portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+				} 
+				HAL_USART_RXNE_DisableInterrupt(&husart1);
+			} else {
+				bufPointer += 1;
+				if (bufPointer >= BUFFER_LENGTH) bufPointer = 0;              
+			}
+			 
+			HAL_USART_RXNE_ClearFlag(&husart1);
+		}             
+    }
 	HAL_EPIC_Clear(0xFFFFFFFF);
 }
 
-
-
-
-USART_HandleTypeDef husart1;
 
 void USART_Init()
 {

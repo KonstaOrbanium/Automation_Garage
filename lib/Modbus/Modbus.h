@@ -160,7 +160,13 @@ typedef struct
 
 #endif
 
-
+typedef struct {
+    uint8_t id;
+    uint8_t fc;
+    uint8_t regAddr[2];
+    uint8_t regCount[2];
+    uint8_t crc[2];
+} ModbusFrame_TypeDef;
 /**
  * @struct modbusHandler_t
  * @brief
@@ -176,7 +182,8 @@ typedef struct
 	GPIO_TypeDef* EN_Port; //!< flow control pin: 0=USB or RS-232 mode, >1=RS-485 mode
 	uint16_t EN_Pin;  //!< flow control pin: 0=USB or RS-232 mode, >1=RS-485 mode
 	mb_errot_t i8lastError;
-	uint8_t u8Buffer[MAX_BUFFER]; //Modbus buffer for communication
+	volatile uint8_t u8Buffer[MAX_BUFFER]; //Modbus buffer for communication
+    volatile uint8_t u8RxBuffer[MAX_BUFFER];
 	uint8_t u8BufferSize;
 	uint8_t u8lastRec;
 	uint16_t *u16regs;

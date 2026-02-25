@@ -9,7 +9,7 @@
 #include "mik32_hal_pcc.h"
 #include "mik32_hal_gpio.h"
 #include "mik32_hal_spifi_w25.h"
-
+#include "mik32_hal_irq.h"
 
 
 
@@ -36,9 +36,10 @@
 #define lowByte(w) ((w) & 0xFF)
 #define highByte(w) ((w) >> 8)
 
-#define BUFFER_LENGTH 50
+
 
 modbusHandler_t *mHandlers[MAX_M_HANDLERS];
+modbusHandler_t mHandle;
 
 //extern void UpdateTCP_Error(unsigned short error);
 //extern void UpdateTCP_Aging(unsigned short aging);
@@ -53,7 +54,7 @@ modbusHandler_t *mHandlers[MAX_M_HANDLERS];
 
 //Semaphore to access the Modbus Data
 uint8_t numberHandlers;
-uint8_t bufPointer;
+
 
 
 static void sendTxBuffer(modbusHandler_t *modH);
@@ -155,7 +156,6 @@ extern USART_HandleTypeDef husart1;
  * Инит структуры модбас с последующим инитом и старта самого модбаса
  */
 void modbusPreInit(modbusHandler_t *modH) {
-    
     modH->EN_Port = USART1_REDE_PORT;
     modH->EN_Pin = USART1_REDE_PIN;
     modH->port = &husart1;
@@ -175,7 +175,9 @@ void modbusPreInit(modbusHandler_t *modH) {
  */
 void ModbusInit(modbusHandler_t *modH)
 {
+
     modbusPreInit(modH);
+
     if (numberHandlers < MAX_M_HANDLERS)
     {
 
@@ -193,10 +195,17 @@ void ModbusInit(modbusHandler_t *modH)
             }
 
 #else  
-           
-          	if (!xTaskCreate(StartTaskModbusSlave, "TaskModbusSlave", 1024, modH, tskIDLE_PRIORITY + 1 , NULL)) {
+            
+            
+            ModbusStart(modH);
+            modH->queueTaskSlaveHandle = xQueueCreate(50, sizeof(uint8_t));
+            if (!modH->queueTaskSlaveHandle) {
+                return;
+            }               	
+            if (!xTaskCreate(StartTaskModbusSlave, "TaskModbusSlave", 1024, modH, tskIDLE_PRIORITY + 1 , NULL)) {
                     return;
                 }
+      
 #endif
 
         }
@@ -232,7 +241,7 @@ void ModbusInit(modbusHandler_t *modH)
             }
 
             modH->QueueTelegramHandle = xQueueCreate(MAX_TELEGRAMS, sizeof(modbus_t));
-            modH->queueTaskSlaveHandle = xQueueCreate(100, sizeof(uint8_t));
+            
 
             if (modH->QueueTelegramHandle == NULL)
             {
@@ -244,10 +253,12 @@ void ModbusInit(modbusHandler_t *modH)
             while (1); //Error Modbus type not supported choose a valid Type
         }
 
-        if (modH->myTaskModbusAHandle == NULL)
-        {
-            while (1); //Error creating Modbus task, check heap and stack size
-        }
+        // if (modH->myTaskModbusAHandle == NULL)
+        // {
+        //     while (1) {
+                
+        //     } //Error creating Modbus task, check heap and stack size
+        // }
 
         // modH->xTimerT35 = xTimerCreate("TimerT35",         // Just a text name, not used by the kernel.
         //         T35,     // The timer period in ticks.
@@ -255,20 +266,23 @@ void ModbusInit(modbusHandler_t *modH)
         //         (void*) modH->xTimerT35,     // Assign each timer a unique id equal to its array index.
         //         (TimerCallbackFunction_t) vTimerCallbackT35     // Each timer calls the same callback when it expires.
         //         );
-        if (modH->xTimerT35 == NULL)
-        {
-            while (1); //Error creating the timer, check heap and stack size
-        }
+        // if (modH->xTimerT35 == NULL)
+        // {
+        //     while (1); //Error creating the timer, check heap and stack size
+        // }
 
         modH->ModBusSphrHandle = xSemaphoreCreateBinary();
 
         if (modH->ModBusSphrHandle == NULL)
         {
-            while (1); //Error creating the semaphore, check heap and stack size
+            while (1) {
+                
+            } //Error creating the semaphore, check heap and stack size
         }
 
         mHandlers[numberHandlers] = modH;
         numberHandlers++;
+         
     }
     else
     {
@@ -291,7 +305,7 @@ void ModbusInit(modbusHandler_t *modH)
  */
 void ModbusStart(modbusHandler_t *modH)
 {
-
+    
     if (modH->xTypeHW != USART_HW && modH->xTypeHW != TCP_HW && modH->xTypeHW != USB_CDC_HW && modH->xTypeHW != USART_HW_DMA)
     {
 
@@ -312,37 +326,38 @@ void ModbusStart(modbusHandler_t *modH)
             HAL_GPIO_WritePin(modH->EN_Port, modH->EN_Pin, GPIO_PIN_LOW);
         }
 
-        if (modH->uModbusType == MB_SLAVE && modH->u16regs == NULL)
-        {
-            while (1); //ERROR define the DATA pointer shared through Modbus
-        }
+        // if (modH->uModbusType == MB_SLAVE && modH->u16regs == NULL)
+        // {
+        //     while (1); //ERROR define the DATA pointer shared through Modbus
+        // }
 
         //check that port is initialized
         // while (HAL_UART_GetState(modH->port) != HAL_UART_STATE_READY)
         // {
 
     }
-        HAL_EPIC_MaskLevelSet(HAL_EPIC_UART_1_MASK); 
-        HAL_IRQ_EnableInterrupts();
-        HAL_USART_RXNE_EnableInterrupt(&husart1);
-
-        if (modH->u8id != 0 && modH->uModbusType == MB_MASTER)
+ 
+    HAL_EPIC_MaskLevelSet(HAL_EPIC_UART_1_MASK); 
+    HAL_IRQ_EnableInterrupts();
+    HAL_USART_RXNE_EnableInterrupt(&husart1);
+   
+    if (modH->u8id != 0 && modH->uModbusType == MB_MASTER)
+    {
+        while (1)
         {
-            while (1)
-            {
-                //error Master ID must be zero
-            }
-
+            //error Master ID must be zero
         }
 
-        if (modH->u8id == 0 && modH->uModbusType == MB_SLAVE)
-        {
-            while (1)
-            {
-                //error Master ID must be zero
-            }
+    }
 
+    if (modH->u8id == 0 && modH->uModbusType == MB_SLAVE)
+    {
+        while (1)
+        {
+            //error Master ID must be zero
         }
+
+    }
 
 #if ENABLE_TCP == 1
 
@@ -350,7 +365,7 @@ void ModbusStart(modbusHandler_t *modH)
 
     modH->u8lastRec = modH->u8BufferSize = 0;
     modH->u16InCnt = modH->u16OutCnt = modH->u16errCnt = 0;
-
+    
 }
 
 #if ENABLE_USB_CDC == 1
@@ -580,8 +595,7 @@ void TCPinitserver(modbusHandler_t *modH)
 
 void StartTaskModbusSlave(void *argument)
 {
-
-
+ 
   modbusHandler_t *modH = (modbusHandler_t*)argument;
 
 
@@ -592,62 +606,67 @@ void StartTaskModbusSlave(void *argument)
 //    {
 //        TCPinitserver(modH); // start the Modbus server slave
 //    }
+ 
 #endif
-
     for (;;)
     {
-    	uint32_t ulNotificationValue = 0;
+    	uint64_t ulNotificationValue = 0;
+        
+        if (xQueueReceive(modH->queueTaskSlaveHandle, &ulNotificationValue, 400) == pdTRUE)
+        {
+            if (1) {
+                if (1)
+                {
+                    modH->i8lastError = 0;
+                    
+#if ENABLE_USB_CDC == 1
 
-			if (xQueueReceive(modH->queueTaskSlaveHandle, &ulNotificationValue, portMAX_DELAY) == pdTRUE)
-			{
-				if (ulNotificationValue & 0x0000FFFF)
-				{
-					modH->i8lastError = 0;
+        if(modH-> xTypeHW == USB_CDC_HW)
+        {
+                    ulTaskNotifyTake(pdTRUE, portMAX_DELAY); /* Block indefinitely until a Modbus Frame arrives */
+                if (modH->u8BufferSize == ERR_BUFF_OVERFLOW) // is this necessary?
+                {
+                        modH->i8lastError = ERR_BUFF_OVERFLOW;
+                        modH->u16errCnt++;
+                        continue;
+                }
+        }
+#endif
+                   // memcpy((void*)mHandlers[0]->u8Buffer, (void*)mHandlers[0]->u8RxBuffer, 8);
+                    HAL_USART_Write(&husart1, (char*)mHandlers[0]->u8RxBuffer, 8, 300);
+                    HAL_USART_TXC_ClearFlag(&husart1);
+                    HAL_USART_RXNE_EnableInterrupt(&husart1);
+                     
+                    modH->u8BufferSize = ulNotificationValue & 0x000000FF;
+                
+                    modH->u16InCnt++;
+                    if (modH->u8BufferSize < 7)
+                    {
+                    
+                        //The size of the frame is invalid
+                        modH->i8lastError = ERR_BAD_SIZE;
+                        modH->u16errCnt++;
 
-	#if ENABLE_USB_CDC == 1
+                        continue;
+                    }
+                     
+                    if (modH->u8Buffer[ID] != modH->u8id)
+                    {
+#if ENABLE_TCP == 0      
+                        
+                        continue; // continue this is not for us
+#else
+                        if (modH->xTypeHW != TCP_HW)
+                        {
+                                continue; //for Modbus TCP this is not validated, user should modify accordingly if needed
+                        }
+#endif
+                    }
 
-			if(modH-> xTypeHW == USB_CDC_HW)
-			{
-						ulTaskNotifyTake(pdTRUE, portMAX_DELAY); /* Block indefinitely until a Modbus Frame arrives */
-					if (modH->u8BufferSize == ERR_BUFF_OVERFLOW) // is this necessary?
-					{
-						 modH->i8lastError = ERR_BUFF_OVERFLOW;
-						 modH->u16errCnt++;
-						 continue;
-					}
-			}
-	#endif
-
-					modH->u8BufferSize = ulNotificationValue & 0x000000FF;
-					
-					modH->u16InCnt++;
-					if (modH->u8BufferSize < 7)
-					{
-							//The size of the frame is invalid
-							modH->i8lastError = ERR_BAD_SIZE;
-							modH->u16errCnt++;
-
-							continue;
-					}
-
-					// check slave id
-					if (modH->u8Buffer[ID] != modH->u8id)
-					{
-
-	#if ENABLE_TCP == 0
-				continue; // continue this is not for us
-	#else
-							if (modH->xTypeHW != TCP_HW)
-							{
-									continue; //for Modbus TCP this is not validated, user should modify accordingly if needed
-							}
-	#endif
-					}
-
-					// validate message: CRC, FCT, address and size
-					uint8_t u8exception = validateRequest(modH);
-					if (u8exception > 0)															 ///< TODO ????????????????????????????????
-					{
+                // validate message: CRC, FCT, address and size
+                    uint8_t u8exception = validateRequest(modH);
+                    if (u8exception > 0)															 ///< TODO ????????????????????????????????
+                    {
                         if (u8exception != ERR_TIME_OUT) 							 ///< TODO ????????????????????????????????
                         {
                                                                                         //                buildException(u8exception, dataExchange);
@@ -657,40 +676,41 @@ void StartTaskModbusSlave(void *argument)
                         //return u8exception
 
                         continue;
-					}
+                    }
 
-					modH->i8lastError = 0;
+                    modH->i8lastError = 0;
 
-					// process message
-					switch (modH->u8Buffer[FUNC])
-					{
-							case MB_FC_READ_COILS:
-							case MB_FC_READ_DISCRETE_INPUT:
-									modH->i8state = process_FC1(modH);
-									break;
-							case MB_FC_READ_INPUT_REGISTER:
-							case MB_FC_READ_REGISTERS:
-									modH->i8state = process_FC3(modH);
-									break;
-							case MB_FC_WRITE_COIL:
-									modH->i8state = process_FC5(modH);
-									break;
-							case MB_FC_WRITE_REGISTER:
-									modH->i8state = process_FC6(modH);
-									break;
-							case MB_FC_WRITE_MULTIPLE_COILS:
-									modH->i8state = process_FC15(modH);
-									break;
-							case MB_FC_WRITE_MULTIPLE_REGISTERS:
-									modH->i8state = process_FC16(modH);
-									break;
-							default:
-									break;
-					}
+                    // process message
+                    switch (modH->u8Buffer[FUNC])
+                    {
+                            case MB_FC_READ_COILS:
+                            case MB_FC_READ_DISCRETE_INPUT:
+                                    modH->i8state = process_FC1(modH);
+                                    break;
+                            case MB_FC_READ_INPUT_REGISTER:
+                            case MB_FC_READ_REGISTERS:
+                                    modH->i8state = process_FC3(modH);
+                                    break;
+                            case MB_FC_WRITE_COIL:
+                                    modH->i8state = process_FC5(modH);
+                                    break;
+                            case MB_FC_WRITE_REGISTER:
+                                    modH->i8state = process_FC6(modH);
+                                    break;
+                            case MB_FC_WRITE_MULTIPLE_COILS:
+                                    modH->i8state = process_FC15(modH);
+                                    break;
+                            case MB_FC_WRITE_MULTIPLE_REGISTERS:
+                                    modH->i8state = process_FC16(modH);
+                                    break;
+                            default:
+                                    break;
+                    }
 
-					continue;
-				}
-			}
+                    continue;
+                }
+            }
+        }
     }
 }
 
@@ -1457,7 +1477,9 @@ static void sendTxBuffer(modbusHandler_t *modH)
         // transfer buffer to serial line IT
         //    HAL_UART_Transmit_IT(modH->port, modH->u8Buffer, modH->u8BufferSize);
 
-        HAL_USART_Write(&husart1, (char*)mHandlers[numberHandlers]->u8Buffer, modH->u8BufferSize + 2, 300);
+        // HAL_USART_Write(&husart1, (char*)mHandlers[0]->u8Buffer, modH->u8BufferSize, 300);
+        // HAL_USART_RXNE_EnableInterrupt(&husart1);
+        
 #if ENABLE_USART_DMA == 1
     	}
         else
@@ -1605,7 +1627,7 @@ static void sendTxBuffer(modbusHandler_t *modH)
 int8_t process_FC1(modbusHandler_t *modH)
 {
 
-//    uint16_t u16currentRegister;
+    uint16_t u16currentRegister;
     uint8_t u8bytesno, u8bitsno;
     uint8_t u8CopyBufferSize;
     uint16_t u16currentCoil;
@@ -1853,26 +1875,32 @@ int8_t process_FC16(modbusHandler_t *modH)
     return u8CopyBufferSize;
 }
 
-const uint8_t Modbus_FrameCount = 8;
-void trap_handler() {
-    if (EPIC_CHECK_UART_1()) {
-        /* Прием данных: запись в буфер */
-        if (HAL_USART_RXNE_ReadFlag(&husart1)) {
-            mHandlers[0]->u8Buffer[bufPointer] = HAL_USART_ReadByte(&husart1);
-            if (bufPointer >= Modbus_FrameCount) {
-                bufPointer = 0;
-                uint32_t ulNotificationValue = 1;
-                if (mHandlers[0]->queueTaskSlaveHandle) {
-                    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-                    xQueueSendToBackFromISR(mHandlers[0]->queueTaskSlaveHandle, &ulNotificationValue, &xHigherPriorityTaskWoken);
-                    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-                }
-            } else {
-                bufPointer += 1;
-                if (bufPointer >= BUFFER_LENGTH) bufPointer = 0;              
-            }
-            HAL_USART_RXNE_ClearFlag(&husart1);
-        }             
-    }
-   HAL_EPIC_Clear(0xFFFFFFFF);
-}
+// void trap_handler() {
+
+//             HAL_GPIO_TogglePin(GPIO_1, GPIO_PIN_3);
+//             HAL_GPIO_TogglePin(GPIO_0, GPIO_PIN_3);
+                 
+//                     //HAL_DelayMs(100);
+                
+//     if (EPIC_CHECK_UART_1()) {
+        
+//         /* Прием данных: запись в буфер */
+//         if (HAL_USART_RXNE_ReadFlag(&husart1)) {
+//             mHandlers[0]->u8Buffer[bufPointer] = HAL_USART_ReadByte(&husart1);
+//             if (bufPointer >= Modbus_FrameCount) {
+//                 bufPointer = 0;
+//                 uint32_t ulNotificationValue = Modbus_FrameCount;
+//                 if (mHandlers[0]->queueTaskSlaveHandle) {
+//                     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+//                     xQueueSendToBackFromISR(mHandlers[0]->queueTaskSlaveHandle, &ulNotificationValue, &xHigherPriorityTaskWoken);
+//                     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+//                 }
+//             } else {
+//                 bufPointer += 1;
+//                 if (bufPointer >= BUFFER_LENGTH) bufPointer = 0;              
+//             }
+//             HAL_USART_RXNE_ClearFlag(&husart1);
+//         }             
+//     }
+//    HAL_EPIC_Clear(0xFFFFFFFF);
+// }
