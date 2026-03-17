@@ -26,8 +26,7 @@
 #define NUMBER_OF_OUTPUTS       7
 #define NUMBER_OF_SETTINGS      9
 
-#define USART1_REDE_PIN GPIO_PIN_11
-#define USART1_REDE_PORT GPIO_1
+
 
 
 
@@ -63,3 +62,4 @@ extern void *Modbus_Regmap_DoStates[NUMBER_OF_OUTPUTS + NUMBER_OF_SETTINGS];
  
 int8_t Modbus_Regmap_GetCopyOfItem(const uint16_t addr, void  *value, const uint32_t typeSize);
 int8_t Modbus_Regmap_SetItem(const uint16_t addr, void *pObject, const uint32_t typeSize);
+int8_t Modbus_Regmap_InitObject(uint8_t addr, void *pObject);

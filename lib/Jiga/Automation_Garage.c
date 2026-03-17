@@ -12,7 +12,7 @@
 
 ModbusSettings_TypeDef MbSettings = {
     /* DO */
-    .fogLight            = 0,           ///< Противотуманное освещение 
+    .fogLight            = 1,           ///< Противотуманное освещение 
     .stopLight           = 0,           ///< Стоп-сигнал
     .turnLight           = 0,           ///< Указатель поворота (Включить в режиме стандартный)
     .reversingLight      = 0,           ///< Задний ход  
@@ -35,10 +35,10 @@ ModbusSettings_TypeDef MbSettings = {
 
 void Automation_Garage_InitAllObjects() {
     for (int i = FOG_LIGHT_ADDR; i <= TEST_LIGHT; ++i) {
-        Modbus_Regmap_SetItem(i, (void*)(&MbSettings.fogLight + i), sizeof(bool));
+        Modbus_Regmap_InitObject(i, (void*)(&MbSettings.fogLight + i));
     }
     for (int i = FOG_LIGHT_B_MAX_ADDR; i <= TEST_LIGHT_B_TIME_ADDR; ++i) {
-        Modbus_Regmap_SetItem(i, (void*)(&MbSettings.fogLight + i), sizeof(uint16_t));
+        Modbus_Regmap_InitObject(i, (void*)(&MbSettings.fogLight + i));
     }
 }
 

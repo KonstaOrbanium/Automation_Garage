@@ -26,6 +26,7 @@
 /* Note: the total aging time for a connection is approximately NUMBERTCPCONN*TCPAGINGCYCLES*u16timeOut ticks
  * for the values selected in this example it is approximately 40 seconds
  */
-
+#define USART1_REDE_PIN GPIO_PIN_11
+#define USART1_REDE_PORT GPIO_1
 
 #endif /* THIRD_PARTY_MODBUS_LIB_CONFIG_MODBUSCONFIG_H_ */

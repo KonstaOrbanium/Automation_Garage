@@ -9,6 +9,8 @@
 #include "xprintf.h"
 
 #include "Modbus.h"
+#include "Modbus_Config.h"
+#include "Automation_Garage.h"
 /**
  * @file main.c
  * @brief Пример портирования ОСРВ FreeRTOS для MIK32
@@ -80,21 +82,21 @@ GPIOs_TypeDef flashlights[] = {
 // Задача мигания светодиодом.
 void blink_task(void *pvParameters)
 {
-	const led_config_t *cfg = (const led_config_t *)pvParameters;
-
+	//Automation_Garage_InitAllObjects();
 	ModbusInit(&mHandle);
 
-	// for (;;)
-	// {
-	// 	L_GPIO_TogglePin(cfg->port, cfg->pin);
-		
-      
-    //         HAL_GPIO_TogglePin(GPIO_1, GPIO_PIN_3);
-    //         HAL_GPIO_TogglePin(GPIO_0, GPIO_PIN_3);
-    //         vTaskDelay(pdMS_TO_TICKS(1000));
+	for (;;)
+	{ 
+		HAL_GPIO_TogglePin(GPIO_1, GPIO_PIN_3);
+		//HAL_GPIO_TogglePin(GPIO_2, GPIO_PIN_6);
+		vTaskDelay(pdMS_TO_TICKS(200));
 			
-	// }
+	}
 	vTaskDelete((TaskHandle_t)NULL);
+    // for (int i = 0; i < 6; ++i) {
+    //             HAL_GPIO_TogglePin(GPIO_2, GPIO_PIN_6);
+    //             HAL_DelayMs(150);
+    //         }
 }
 
 
@@ -103,20 +105,19 @@ int main()
 	HAL_Init();
 
 	SystemClock_Config();
+    HAL_DelayMs(300);
 	// Timer32_1_Init();
 	GPIO_Init();
-
+   
 	USART_Init();
-	//xprintf("Start\n");   ///< TODO Понять, почему была ошибка
 
 	SPIFI_Init(); 					///< Для работы с QPSIFI
 	//Startup_SPIFI_Config();		///< Для работы с SPIFI
-	//Мигаем несколько раз для индикации успешной инициализации.
-
- 
+	
+   
 	// Разрешить прерывания по уровню для линии EPIC GPIO_IRQ.
 
-	HAL_GPIO_ClearInterrupts();
+	//HAL_GPIO_ClearInterrupts();
 	HAL_EPIC_Clear(0xFFFFFFFF);
 	
 	// Создание бинарного семафора.
@@ -127,7 +128,7 @@ int main()
 				"LED1",
 				128,
 				NULL,
-				tskIDLE_PRIORITY + 1 ,
+				tskIDLE_PRIORITY + 1,
 				NULL);
 
 	vTaskStartScheduler();
@@ -158,22 +159,22 @@ void GPIO_Init()
 	__HAL_PCC_GPIO_0_CLK_ENABLE();
 	__HAL_PCC_GPIO_1_CLK_ENABLE();
 	__HAL_PCC_GPIO_2_CLK_ENABLE();
-	__HAL_PCC_GPIO_IRQ_CLK_ENABLE();
+	//__HAL_PCC_GPIO_IRQ_CLK_ENABLE();
 
 	// Инициализация LED1 и LED2
-	GPIO_InitStruct.Pin = LED1_PIN;
 	GPIO_InitStruct.Mode = HAL_GPIO_MODE_GPIO_OUTPUT;
 	GPIO_InitStruct.Pull = HAL_GPIO_PULL_NONE;
-	HAL_GPIO_Init(LED1_PORT, &GPIO_InitStruct);
+	GPIO_InitStruct.Pin = GPIO_PIN_3;
+	HAL_GPIO_Init(GPIO_1, &GPIO_InitStruct);
 
-	GPIO_InitStruct.Pin = LED2_PIN;
-	HAL_GPIO_Init(LED2_PORT, &GPIO_InitStruct);
-
-	// Инициализация пользовательской кнопки
-	GPIO_InitStruct.Pin = BTN_PIN;
-	GPIO_InitStruct.Mode = HAL_GPIO_MODE_GPIO_INPUT;
-	HAL_GPIO_Init(BTN_PORT, &GPIO_InitStruct);
-	HAL_GPIO_InitInterruptLine(BTN_IRQ_LINE_MUX, GPIO_INT_MODE_FALLING);
+	
+	GPIO_InitStruct.Pin = USART1_REDE_PIN;
+	HAL_GPIO_Init(USART1_REDE_PORT, &GPIO_InitStruct);
+	// // Инициализация пользовательской кнопки
+	// GPIO_InitStruct.Pin = BTN_PIN;
+	// GPIO_InitStruct.Mode = HAL_GPIO_MODE_GPIO_INPUT;
+	// HAL_GPIO_Init(BTN_PORT, &GPIO_InitStruct);
+	// HAL_GPIO_InitInterruptLine(BTN_IRQ_LINE_MUX, GPIO_INT_MODE_FALLING);
 }
 
 
@@ -220,45 +221,90 @@ const uint8_t Modbus_FrameCount = 8;
 #define BUFFER_LENGTH 50
 
 // Обработчик прерываний.
-RAM_ATTR void freertos_risc_v_application_interrupt_handler(void)
-{
-	if (EPIC_CHECK_GPIO_IRQ())
-	{
-		if (HAL_GPIO_LineInterruptState(BTN_IRQ_LINE))
-		{
-			BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+// RAM_ATTR void freertos_risc_v_application_interrupt_handler(void)
+// {
+// 	// if (EPIC_CHECK_GPIO_IRQ())
+// 	// {
+// 	// 	if (HAL_GPIO_LineInterruptState(BTN_IRQ_LINE))
+// 	// 	{
+// 	// 		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
-			xSemaphoreGiveFromISR(xButtonSemaphore, &xHigherPriorityTaskWoken);
-			portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-		}
-		HAL_GPIO_ClearInterrupts();
-	}
- 	if (EPIC_CHECK_UART_1()) {
-	/* Прием данных: запись в буфер */
-		if (HAL_USART_RXNE_ReadFlag(&husart1)) {
-			BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-			 
-			mHandlers[0]->u8RxBuffer[bufPointer] = HAL_USART_ReadByte(&husart1);
-			if (bufPointer >= Modbus_FrameCount) {
-				bufPointer = 0;
-				uint8_t ulNotificationValue = 0;
+// 	// 		xSemaphoreGiveFromISR(xButtonSemaphore, &xHigherPriorityTaskWoken);
+// 	// 		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+// 	// 	}
+// 	// 	HAL_GPIO_ClearInterrupts();
+// 	// }
+//  	if (EPIC_CHECK_UART_1()) {
+// 	/* Прием данных: запись в буфер */
+// 		// if (!(husart1.Instance->FLAGS & UART_FLAGS_ORE_M)) {
+// 		// 	HAL_GPIO_TogglePin(GPIO_1, GPIO_PIN_3);
+// 		// 	HAL_USART_ReceiveOverwrite_ClearFlag(&husart1);
+// 		// 	bufPointer = 0; 
+// 		// }
+// 		if (HAL_USART_RXNE_ReadFlag(&husart1)) {
+// 			BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+			
+// 			mHandlers[0]->u8RxBuffer[bufPointer] = HAL_USART_ReadByte(&husart1);
+// 			if (bufPointer >= Modbus_FrameCount) {
+// 				bufPointer = 0;
+// 				uint8_t ulNotificationValue = Modbus_FrameCount;
 				
-				
-				if (mHandlers[0]->queueTaskSlaveHandle) {
-						
-					xQueueSendToBackFromISR(mHandlers[0]->queueTaskSlaveHandle, &ulNotificationValue, &xHigherPriorityTaskWoken);
-					portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-				} 
-				HAL_USART_RXNE_DisableInterrupt(&husart1);
-			} else {
-				bufPointer += 1;
-				if (bufPointer >= BUFFER_LENGTH) bufPointer = 0;              
-			}
+// 				if (mHandlers[0]->queueTaskSlaveHandle) {
+// 					xQueueSendToBackFromISR(mHandlers[0]->queueTaskSlaveHandle, 
+// 						&ulNotificationValue, &xHigherPriorityTaskWoken);               
+                
+// 					portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+// 				} 
+// 				memset((void*)mHandlers[0]->u8RxBuffer, 0, BUFFER_LENGTH);
+// 				//HAL_USART_RXNE_DisableInterrupt(&husart1);
+// 			} else {
+// 				bufPointer += 1;
+// 				if (bufPointer >= BUFFER_LENGTH) bufPointer = 0;              
+// 			}
 			 
+// 			HAL_USART_RXNE_ClearFlag(&husart1);
+// 		}             
+//     }
+// 	HAL_EPIC_Clear(0xFFFFFFFF);
+// }
+
+RAM_ATTR void freertos_risc_v_application_interrupt_handler(void) {
+    if (EPIC_CHECK_UART_1()) {
+
+		// --- Проверка ORE и сброс ---
+        if (husart1.Instance->FLAGS & UART_FLAGS_ORE_M) {
+            HAL_USART_ReceiveOverwrite_ClearFlag(&husart1);
+        }
+
+        // --- Чтение всех пришедших байт ---
+        if (HAL_USART_RXNE_ReadFlag(&husart1)) { 
+            uint8_t byte = 0;
+            HAL_USART_Receive(&husart1, (char*)&byte, 0);
+            if (bufPointer < BUFFER_LENGTH) {
+                mHandlers[0]->u8RxBuffer[bufPointer++] = byte;
+            }
 			HAL_USART_RXNE_ClearFlag(&husart1);
-		}             
+        }
+   
+        // --- Проверка IDLE (конец кадра) ---
+        if (HAL_USART_IDLE_ReadFlag(&husart1)) {
+            HAL_USART_IDLE_ClearFlag(&husart1);
+
+            BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+            uint8_t size = bufPointer;
+            
+            xQueueSendFromISR(
+                mHandlers[0]->queueTaskSlaveHandle,
+                &size,
+                &xHigherPriorityTaskWoken
+            );
+			
+            bufPointer = 0;
+            portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+        }
     }
-	HAL_EPIC_Clear(0xFFFFFFFF);
+
+    HAL_EPIC_Clear(0xFFFFFFFF);
 }
 
 
@@ -301,6 +347,6 @@ void USART_Init()
     husart1.Modem.dsr = Disable; //in
     husart1.Modem.ri = Disable;  //in
     husart1.Modem.ddis = Disable;//out
-    husart1.baudrate = 115200;
+    husart1.baudrate = 4800;
     HAL_USART_Init(&husart1);
 }

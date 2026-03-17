@@ -340,7 +340,9 @@ void ModbusStart(modbusHandler_t *modH)
     HAL_EPIC_MaskLevelSet(HAL_EPIC_UART_1_MASK); 
     HAL_IRQ_EnableInterrupts();
     HAL_USART_RXNE_EnableInterrupt(&husart1);
-   
+    HAL_USART_IDLE_EnableInterrupt(&husart1);
+    HAL_USART_RX_Error_EnableInterrupt(&husart1);
+    
     if (modH->u8id != 0 && modH->uModbusType == MB_MASTER)
     {
         while (1)
@@ -610,15 +612,13 @@ void StartTaskModbusSlave(void *argument)
 #endif
     for (;;)
     {
-    	uint64_t ulNotificationValue = 0;
+    	uint8_t ulNotificationValue = 0;
         
-        if (xQueueReceive(modH->queueTaskSlaveHandle, &ulNotificationValue, 400) == pdTRUE)
-        {
+        if (xQueueReceive(modH->queueTaskSlaveHandle, &ulNotificationValue, 100) == pdTRUE) {
             if (1) {
-                if (1)
-                {
+                if (1) {
                     modH->i8lastError = 0;
-                    
+                    memcpy((void*)mHandlers[0]->u8Buffer, (void*)mHandlers[0]->u8RxBuffer, 8);
 #if ENABLE_USB_CDC == 1
 
         if(modH-> xTypeHW == USB_CDC_HW)
@@ -632,28 +632,26 @@ void StartTaskModbusSlave(void *argument)
                 }
         }
 #endif
-                   // memcpy((void*)mHandlers[0]->u8Buffer, (void*)mHandlers[0]->u8RxBuffer, 8);
-                    HAL_USART_Write(&husart1, (char*)mHandlers[0]->u8RxBuffer, 8, 300);
-                    HAL_USART_TXC_ClearFlag(&husart1);
-                    HAL_USART_RXNE_EnableInterrupt(&husart1);
-                     
+
+                    // HAL_USART_Write(&husart1, (char*)mHandlers[0]->u8RxBuffer, 8, 300);
+                    // HAL_USART_TXC_ClearFlag(&husart1);
+                    // HAL_USART_RXNE_EnableInterrupt(&husart1);
+
                     modH->u8BufferSize = ulNotificationValue & 0x000000FF;
-                
+                        
                     modH->u16InCnt++;
-                    if (modH->u8BufferSize < 7)
-                    {
-                    
+                    if (modH->u8BufferSize < 7) {
                         //The size of the frame is invalid
                         modH->i8lastError = ERR_BAD_SIZE;
                         modH->u16errCnt++;
-
+                        //HAL_USART_RXNE_EnableInterrupt(&husart1);
                         continue;
                     }
-                     
+                       
                     if (modH->u8Buffer[ID] != modH->u8id)
                     {
 #if ENABLE_TCP == 0      
-                        
+                        //HAL_USART_RXNE_EnableInterrupt(&husart1);
                         continue; // continue this is not for us
 #else
                         if (modH->xTypeHW != TCP_HW)
@@ -674,7 +672,7 @@ void StartTaskModbusSlave(void *argument)
                         }
                         modH->i8lastError = u8exception;
                         //return u8exception
-
+                        //HAL_USART_RXNE_EnableInterrupt(&husart1);
                         continue;
                     }
 
@@ -1272,7 +1270,7 @@ uint8_t validateRequest(modbusHandler_t *modH)
     }
 #else
     uint16_t u16MsgCRC;
-    u16MsgCRC= ((modH->u8Buffer[modH->u8BufferSize - 2] << 8)
+    u16MsgCRC = ((modH->u8Buffer[modH->u8BufferSize - 2] << 8)
             | modH->u8Buffer[modH->u8BufferSize - 1]); // combine the crc Low & High bytes
 
     if ( calcCRC( modH->u8Buffer, modH->u8BufferSize-2 ) != u16MsgCRC )
@@ -1450,9 +1448,9 @@ static void sendTxBuffer(modbusHandler_t *modH)
 
         uint16_t u16crc = calcCRC(modH->u8Buffer, modH->u8BufferSize);
         modH->u8Buffer[modH->u8BufferSize] = u16crc >> 8;
-        modH->u8BufferSize++;
-        modH->u8BufferSize++;
+        modH->u8BufferSize++;  
         modH->u8Buffer[modH->u8BufferSize] = u16crc & 0x00ff;
+        modH->u8BufferSize++;
 
 #if ENABLE_TCP == 1
     }
@@ -1467,7 +1465,10 @@ static void sendTxBuffer(modbusHandler_t *modH)
         {
             //enable transmitter, disable receiver to avoid echo on RS485 transceivers
 //            HAL_HalfDuplex_EnableTransmitter(modH->port);
-            HAL_GPIO_WritePin(modH->EN_Port, modH->EN_Pin, GPIO_PIN_HIGH);
+             HAL_DelayUs(4000);
+             HAL_GPIO_WritePin(modH->EN_Port, modH->EN_Pin, GPIO_PIN_HIGH);
+             
+           
         }
 
 #if ENABLE_USART_DMA == 1
@@ -1476,9 +1477,15 @@ static void sendTxBuffer(modbusHandler_t *modH)
 #endif
         // transfer buffer to serial line IT
         //    HAL_UART_Transmit_IT(modH->port, modH->u8Buffer, modH->u8BufferSize);
-
-        // HAL_USART_Write(&husart1, (char*)mHandlers[0]->u8Buffer, modH->u8BufferSize, 300);
-        // HAL_USART_RXNE_EnableInterrupt(&husart1);
+        
+        if (!HAL_USART_Write(&husart1, (char*)mHandlers[0]->u8Buffer, modH->u8BufferSize, 0)) {
+            // for (int i = 0; i < 6; ++i) {
+            //     HAL_GPIO_TogglePin(GPIO_2, GPIO_PIN_6);
+            //     vTaskDelay(pdMS_TO_TICKS(200));
+            // }
+             
+        }
+        HAL_USART_TXC_ClearFlag(&husart1);
         
 #if ENABLE_USART_DMA == 1
     	}
@@ -1511,19 +1518,21 @@ static void sendTxBuffer(modbusHandler_t *modH)
 
         if (modH->EN_Port != NULL)
         {
-
+            
             //return RS485 transceiver to receive mode
-            HAL_GPIO_WritePin(modH->EN_Port, modH->EN_Pin, GPIO_PIN_LOW);
+             HAL_GPIO_WritePin(modH->EN_Port, modH->EN_Pin, GPIO_PIN_LOW);
+             HAL_DelayUs(4000);
+             
             //enable receiver, disable transmitter
 //            HAL_HalfDuplex_EnableReceiver(modH->port);
 
         }
 
         // set timeout for master query
-        if (modH->uModbusType == MB_MASTER)
-        {
-            xTimerReset(modH->xTimerTimeout, 0);
-        }
+        // if (modH->uModbusType == MB_MASTER)
+        // {
+        //     xTimerReset(modH->xTimerTimeout, 0);
+        // }
 #if ENABLE_USB_CDC == 1 || ENABLE_TCP == 1
     }
 
@@ -1656,22 +1665,26 @@ int8_t process_FC1(modbusHandler_t *modH)
 //        bitWrite(modH->u8Buffer[modH->u8BufferSize], u8bitsno, bitRead( modH->u16regs[ u16currentRegister ], u8currentBit ));
 
 //
+
     	if (modH->u8Buffer[FUNC] == MB_FC_READ_COILS) {
             if (u16Coilno > 8) {
                 return -1;
             }
+            
             bool coilValue = false;
-            if (Modbus_Regmap_GetCopyOfItem(u16currentCoil - 1, &coilValue, sizeof(bool))) {
-                modH->u8Buffer[modH->u8BufferSize] |= coilValue;
-            }
+            if (Modbus_Regmap_GetCopyOfItem(u16currentCoil , &coilValue, sizeof(bool))) {
+                modH->u8Buffer[modH->u8BufferSize] |= (coilValue << u8bitsno);
+            } 
             u8bitsno++;
             if (u8bitsno > 7) {
                 u8bitsno = 0;
+                
                 modH->u8BufferSize++;
             }   
     	}
     	else if (modH->u8Buffer[FUNC] == MB_FC_READ_DISCRETE_INPUT) {
     	    if (u16Coilno > 16) {
+                //HAL_USART_RXNE_EnableInterrupt(&husart1);
                 return -1;
             }
     	}
@@ -1680,7 +1693,7 @@ int8_t process_FC1(modbusHandler_t *modH)
     // send outcoming message
    if (u16Coilno % 8 != 0)
        modH->u8BufferSize++;
-    u8CopyBufferSize = ++modH->u8BufferSize + 2;
+    u8CopyBufferSize = modH->u8BufferSize + 2;
     sendTxBuffer(modH);
     return u8CopyBufferSize;
 }
@@ -1748,9 +1761,14 @@ int8_t process_FC5(modbusHandler_t *modH)
     // write to coil
    // bitWrite(modH->u16regs[u16currentRegister], u8currentBit, modH->u8Buffer[NB_HI] == 0xff);
     //HAL_GPIO_WritePin(TU_PoolsOfTU->poolOfPins[u8currentBit].GPIOx, TU_PoolsOfTU->poolOfPins[u8currentBit].GPIO_Pin, (GPIO_PinState)modH->u8Buffer[NB_HI] == 0xFF);
-
+    for (int i = 0; i < 6; ++i) {
+        HAL_GPIO_TogglePin(GPIO_1, GPIO_PIN_3);
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
     bool coilValue = modH->u8Buffer[NB_HI] == 0xFF;
-    if (!Modbus_Regmap_SetItem(u16coil - 1, &coilValue, sizeof(bool))) {
+    if (!Modbus_Regmap_SetItem(u16coil , &coilValue, sizeof(bool))) {
+     
+        //HAL_USART_RXNE_EnableInterrupt(&husart1);
         return -1;
     }
     
