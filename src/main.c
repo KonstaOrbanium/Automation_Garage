@@ -69,7 +69,7 @@ void USART_Init();
 
 typedef struct {
     GPIO_TypeDef *GPIOs;
-    HAL_PinsTypeDef Pins;
+    HAL_PinsTypeDef Pins; 
 }GPIOs_TypeDef;
 
 GPIOs_TypeDef flashlights[] = {
@@ -82,13 +82,16 @@ GPIOs_TypeDef flashlights[] = {
 // Задача мигания светодиодом.
 void blink_task(void *pvParameters)
 {
-	//Automation_Garage_InitAllObjects();
+	Automation_Garage_InitAllObjects();
 	ModbusInit(&mHandle);
 
 	for (;;)
 	{ 
-		HAL_GPIO_TogglePin(GPIO_1, GPIO_PIN_3);
-		//HAL_GPIO_TogglePin(GPIO_2, GPIO_PIN_6);
+		HAL_GPIO_TogglePin(GPIO_2, GPIO_PIN_6);  
+        HAL_GPIO_TogglePin(GPIO_0, GPIO_PIN_0);
+        HAL_GPIO_TogglePin(GPIO_0, GPIO_PIN_1);
+        HAL_GPIO_TogglePin(GPIO_0, GPIO_PIN_2);
+        HAL_GPIO_TogglePin(GPIO_0, GPIO_PIN_3);
 		vTaskDelay(pdMS_TO_TICKS(200));
 			
 	}
@@ -164,12 +167,27 @@ void GPIO_Init()
 	// Инициализация LED1 и LED2
 	GPIO_InitStruct.Mode = HAL_GPIO_MODE_GPIO_OUTPUT;
 	GPIO_InitStruct.Pull = HAL_GPIO_PULL_NONE;
-	GPIO_InitStruct.Pin = GPIO_PIN_3;
-	HAL_GPIO_Init(GPIO_1, &GPIO_InitStruct);
+	GPIO_InitStruct.Pin = GPIO_PIN_6;
+	HAL_GPIO_Init(GPIO_2, &GPIO_InitStruct);
 
 	
 	GPIO_InitStruct.Pin = USART1_REDE_PIN;
 	HAL_GPIO_Init(USART1_REDE_PORT, &GPIO_InitStruct);
+
+    GPIO_InitStruct.Pin = GPIO_PIN_0;
+	HAL_GPIO_Init(GPIO_0, &GPIO_InitStruct);
+
+    GPIO_InitStruct.Pin = GPIO_PIN_1;
+	HAL_GPIO_Init(GPIO_0, &GPIO_InitStruct);
+
+    GPIO_InitStruct.Pin = GPIO_PIN_2;
+	HAL_GPIO_Init(GPIO_0, &GPIO_InitStruct);
+
+    GPIO_InitStruct.Pin = GPIO_PIN_3;
+	HAL_GPIO_Init(GPIO_0, &GPIO_InitStruct);
+
+
+
 	// // Инициализация пользовательской кнопки
 	// GPIO_InitStruct.Pin = BTN_PIN;
 	// GPIO_InitStruct.Mode = HAL_GPIO_MODE_GPIO_INPUT;
@@ -292,7 +310,6 @@ RAM_ATTR void freertos_risc_v_application_interrupt_handler(void) {
 
             BaseType_t xHigherPriorityTaskWoken = pdFALSE;
             uint8_t size = bufPointer;
-            
             xQueueSendFromISR(
                 mHandlers[0]->queueTaskSlaveHandle,
                 &size,
@@ -347,6 +364,6 @@ void USART_Init()
     husart1.Modem.dsr = Disable; //in
     husart1.Modem.ri = Disable;  //in
     husart1.Modem.ddis = Disable;//out
-    husart1.baudrate = 4800;
+    husart1.baudrate = 19200;
     HAL_USART_Init(&husart1);
 }

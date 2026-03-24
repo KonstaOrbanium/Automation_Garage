@@ -33,7 +33,7 @@
 #define configMAX_PRIORITIES                    ( 7 )
 #define configMINIMAL_STACK_SIZE                ( ( unsigned short ) 256 )
 #define configISR_STACK_SIZE_WORDS              128
-#define configTOTAL_HEAP_SIZE                   ( ( size_t ) 10*1024 )
+#define configTOTAL_HEAP_SIZE                   ( ( size_t ) 8*1024 )
 #define configMAX_TASK_NAME_LEN                 ( 16 )
 #define configUSE_TRACE_FACILITY                0
 #define configUSE_16_BIT_TICKS                  0
@@ -54,7 +54,7 @@
 #define configMAX_CO_ROUTINE_PRIORITIES         ( 2 )
 
 /* Software timer definitions. */
-#define configUSE_TIMERS                        1
+#define configUSE_TIMERS                        0
 #define configTIMER_TASK_PRIORITY               ( configMAX_PRIORITIES - 1 )
 #define configTIMER_QUEUE_LENGTH                4
 #define configTIMER_TASK_STACK_DEPTH            ( configMINIMAL_STACK_SIZE )

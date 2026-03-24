@@ -31,13 +31,13 @@
 
 
 typedef struct {
-    volatile uint16_t fogLight;               ///< Противотуманное освещение 
-    volatile uint16_t stopLight;               ///< Стоп-сигнал
-    volatile uint16_t turnLight;               ///< Указатель поворота (Включить в режиме стандартный)
-    volatile uint16_t reversingLight;          ///< Задний ход  
-    volatile uint16_t parkingLight;            ///< Габарит
-    volatile uint16_t stopLightStrobe;         ///< Стоп-сигнал (Включить в режиме стробоскоп)
-    volatile uint16_t testLight;               ///< Тест 
+    volatile bool fogLight;               ///< Противотуманное освещение 
+    volatile bool stopLight;               ///< Стоп-сигнал
+    volatile bool turnLight;               ///< Указатель поворота (Включить в режиме стандартный)
+    volatile bool reversingLight;          ///< Задний ход  
+    volatile bool parkingLight;            ///< Габарит
+    volatile bool stopLightStrobe;         ///< Стоп-сигнал (Включить в режиме стробоскоп)
+    volatile bool testLight;               ///< Тест 
 
     volatile uint16_t fogLightBMax;            ///< Противотуманное освещение (Максимальная яркость)
     volatile uint16_t stopLightBMax;           ///< Стоп-сигнал (Максимальная яркость)
