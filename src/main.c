@@ -49,7 +49,10 @@
 #define _PWM_PIN_2 GPIO_PIN_2
 #define _PWM_PIN_3 GPIO_PIN_3
 
-
+TIMER32_HandleTypeDef htimer32_1;
+TIMER32_CHANNEL_HandleTypeDef htimer32_channel0;
+TIMER32_CHANNEL_HandleTypeDef htimer32_channel1;
+TIMER32_CHANNEL_HandleTypeDef htimer32_channel2;
 
 extern modbusHandler_t mHandle;
 SemaphoreHandle_t xButtonSemaphore;
@@ -66,6 +69,7 @@ void SystemClock_Config();
 void GPIO_Init();
 void SPIFI_Init();
 void USART_Init();
+void Timer32_1_Init();
 
 typedef struct {
     GPIO_TypeDef *GPIOs;
@@ -87,12 +91,9 @@ void blink_task(void *pvParameters)
 
 	for (;;)
 	{ 
-		HAL_GPIO_TogglePin(GPIO_2, GPIO_PIN_6);  
-        HAL_GPIO_TogglePin(GPIO_0, GPIO_PIN_0);
-        HAL_GPIO_TogglePin(GPIO_0, GPIO_PIN_1);
-        HAL_GPIO_TogglePin(GPIO_0, GPIO_PIN_2);
-        HAL_GPIO_TogglePin(GPIO_0, GPIO_PIN_3);
-		vTaskDelay(pdMS_TO_TICKS(200));
+		// HAL_GPIO_TogglePin(GPIO_1, GPIO_PIN_3);  
+       
+		// vTaskDelay(pdMS_TO_TICKS(200));
 			
 	}
 	vTaskDelete((TaskHandle_t)NULL);
@@ -109,16 +110,18 @@ int main()
 
 	SystemClock_Config();
     HAL_DelayMs(300);
-	// Timer32_1_Init();
+	Timer32_1_Init();
 	GPIO_Init();
    
 	USART_Init();
 
 	SPIFI_Init(); 					///< Для работы с QPSIFI
-	//Startup_SPIFI_Config();		///< Для работы с SPIFI
-	
-   
-	// Разрешить прерывания по уровню для линии EPIC GPIO_IRQ.
+	//Startup_SPIFI_C onfig();		///< Для работы с SPIFI
+
+	// HAL_Timer32_Channel_Enable(&htimer32_channel0);
+	// HAL_Timer32_Channel_Enable(&htimer32_channel1);
+	HAL_Timer32_Channel_Enable(&htimer32_channel2);
+    HAL_Timer32_Value_Clear(&htimer32_1);
 
 	//HAL_GPIO_ClearInterrupts();
 	HAL_EPIC_Clear(0xFFFFFFFF);
@@ -167,8 +170,8 @@ void GPIO_Init()
 	// Инициализация LED1 и LED2
 	GPIO_InitStruct.Mode = HAL_GPIO_MODE_GPIO_OUTPUT;
 	GPIO_InitStruct.Pull = HAL_GPIO_PULL_NONE;
-	GPIO_InitStruct.Pin = GPIO_PIN_6;
-	HAL_GPIO_Init(GPIO_2, &GPIO_InitStruct);
+	GPIO_InitStruct.Pin = GPIO_PIN_3;
+	HAL_GPIO_Init(GPIO_1, &GPIO_InitStruct);
 
 	
 	GPIO_InitStruct.Pin = USART1_REDE_PIN;
@@ -308,22 +311,84 @@ RAM_ATTR void freertos_risc_v_application_interrupt_handler(void) {
         if (HAL_USART_IDLE_ReadFlag(&husart1)) {
             HAL_USART_IDLE_ClearFlag(&husart1);
 
+            uint8_t buf[] = { 0x01, 0x01, 0x01, 0x00, 0x51, 0x88 };
+
+            HAL_GPIO_WritePin(USART1_REDE_PORT, USART1_REDE_PIN, GPIO_PIN_HIGH);
+            HAL_USART_Write(&husart1, (char*)buf, 8, 0);
+            HAL_USART_TXC_ClearFlag(&husart1);
+            HAL_GPIO_WritePin(USART1_REDE_PORT, USART1_REDE_PIN, GPIO_PIN_LOW);
             BaseType_t xHigherPriorityTaskWoken = pdFALSE;
             uint8_t size = bufPointer;
-            xQueueSendFromISR(
-                mHandlers[0]->queueTaskSlaveHandle,
-                &size,
-                &xHigherPriorityTaskWoken
-            );
+
+            // xQueueSendFromISR(
+            //     mHandlers[0]->queueTaskSlaveHandle,
+            //     &size,
+            //     &xHigherPriorityTaskWoken
+            // );
 			
             bufPointer = 0;
             portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
         }
     }
+    static int top = 0;
+    if (EPIC_CHECK_TIMER32_1()) {
+         if (!(top % 1000)) {
+            HAL_GPIO_TogglePin(GPIO_1, GPIO_PIN_3);
+         }
+        
+        // HAL_Timer32_Top_Set(&htimer32_1, top);
+        // HAL_Timer32_Channel_OCR_Set(&htimer32_channel0, top >> 1);
+        // HAL_Timer32_Channel_OCR_Set(&htimer32_channel1, top >> 1);
+        // HAL_Timer32_Channel_OCR_Set(&htimer32_channel2, top >> 1);
+        // HAL_Timer32_Value_Clear(&htimer32_1);
+        
+        // if (top >= 19200) {
+        //     top = 0;
+        // }
+        top++;
+        HAL_TIMER32_INTERRUPTFLAGS_CLEAR(&htimer32_1);
+    }
 
     HAL_EPIC_Clear(0xFFFFFFFF);
 }
 
+void Timer32_1_Init(void)
+{
+    htimer32_1.Instance = TIMER32_1;
+    htimer32_1.Top = 200 - 1;
+    htimer32_1.State = TIMER32_STATE_DISABLE;
+    htimer32_1.Clock.Source = TIMER32_SOURCE_PRESCALER;
+    htimer32_1.Clock.Prescaler = 3200 - 1;
+    htimer32_1.InterruptMask = 0;
+    htimer32_1.CountMode = TIMER32_COUNTMODE_FORWARD;
+    HAL_Timer32_Init(&htimer32_1);
+    // htimer32_channel0.TimerInstance = htimer32_1.Instance;
+    // htimer32_channel0.ChannelIndex = TIMER32_CHANNEL_0;
+    // htimer32_channel0.PWM_Invert = TIMER32_CHANNEL_NON_INVERTED_PWM;
+    // htimer32_channel0.Mode = TIMER32_CHANNEL_MODE_PWM;
+    // htimer32_channel0.CaptureEdge = TIMER32_CHANNEL_CAPTUREEDGE_RISING;
+    // htimer32_channel0.OCR = 19201 >> 1;
+    // htimer32_channel0.Noise = TIMER32_CHANNEL_FILTER_OFF;
+    // HAL_Timer32_Channel_Init(&htimer32_channel0);
+
+	// htimer32_channel1.TimerInstance = htimer32_1.Instance;
+    // htimer32_channel1.ChannelIndex = TIMER32_CHANNEL_1;
+    // htimer32_channel1.PWM_Invert = TIMER32_CHANNEL_NON_INVERTED_PWM;
+    // htimer32_channel1.Mode = TIMER32_CHANNEL_MODE_PWM;
+    // htimer32_channel1.CaptureEdge = TIMER32_CHANNEL_CAPTUREEDGE_RISING;
+    // htimer32_channel1.OCR = 7544 >> 1;
+    // htimer32_channel1.Noise = TIMER32_CHANNEL_FILTER_OFF;
+    // HAL_Timer32_Channel_Init(&htimer32_channel1);
+
+	htimer32_channel2.TimerInstance = htimer32_1.Instance;
+    htimer32_channel2.ChannelIndex = TIMER32_CHANNEL_2;
+    htimer32_channel2.PWM_Invert = TIMER32_CHANNEL_NON_INVERTED_PWM;
+    htimer32_channel2.Mode = TIMER32_CHANNEL_MODE_PWM;
+    htimer32_channel2.CaptureEdge = TIMER32_CHANNEL_CAPTUREEDGE_RISING;
+    htimer32_channel2.OCR = (5000) >> 1;
+    htimer32_channel2.Noise = TIMER32_CHANNEL_FILTER_OFF;
+    HAL_Timer32_Channel_Init(&htimer32_channel2);
+}
 
 void USART_Init()
 {
@@ -364,6 +429,6 @@ void USART_Init()
     husart1.Modem.dsr = Disable; //in
     husart1.Modem.ri = Disable;  //in
     husart1.Modem.ddis = Disable;//out
-    husart1.baudrate = 19200;
+    husart1.baudrate = 38400;
     HAL_USART_Init(&husart1);
 }

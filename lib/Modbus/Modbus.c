@@ -4,7 +4,7 @@
 #include "mik32_hal_spifi_w25.h"
 #include "mik32_hal_irq.h"
 
-
+#include "mik32_hal_timer32.h"
 
 #include "FreeRTOS.h"
 
@@ -278,8 +278,8 @@ void ModbusInit(modbusHandler_t *modH)
     }
 }
 
-
-
+extern TIMER32_HandleTypeDef htimer32_1;
+extern TIMER32_CHANNEL_HandleTypeDef htimer32_channel2;
 /**
  * @brief
  * Start object.
@@ -325,11 +325,13 @@ void ModbusStart(modbusHandler_t *modH)
 
     }
  
-    HAL_EPIC_MaskLevelSet(HAL_EPIC_UART_1_MASK); 
+    HAL_EPIC_MaskLevelSet(HAL_EPIC_UART_1_MASK | HAL_EPIC_TIMER32_1_MASK); 
     HAL_IRQ_EnableInterrupts();
     HAL_USART_RXNE_EnableInterrupt(&husart1);
     HAL_USART_IDLE_EnableInterrupt(&husart1);
     HAL_USART_RX_Error_EnableInterrupt(&husart1);
+
+    HAL_Timer32_Base_Start_IT(&htimer32_1);
     //HAL_USART_TXE_EnableInterrupt(&husart1);
 
     if (modH->u8id != 0 && modH->uModbusType == MB_MASTER)
@@ -1161,7 +1163,7 @@ static void sendTxBuffer(modbusHandler_t *modH)
 #endif
         // transfer buffer to serial line IT
         //    HAL_UART_Transmit_IT(modH->port, modH->u8Buffer, modH->u8BufferSize);
-        
+        //HAL_DelayUs(240);
         if (!HAL_USART_Write(&husart1, (char*)mHandlers[0]->u8Buffer, modH->u8BufferSize, 0)) {
             // for (int i = 0; i < 6; ++i) {
             //     HAL_GPIO_TogglePin(GPIO_2, GPIO_PIN_6);
@@ -1170,7 +1172,7 @@ static void sendTxBuffer(modbusHandler_t *modH)
              
         }
         HAL_USART_TXC_ClearFlag(&husart1);
-        HAL_DelayUs(2000);
+        //HAL_DelayUs(240);
         
 #if ENABLE_USART_DMA == 1
     	}
@@ -1203,16 +1205,16 @@ static void sendTxBuffer(modbusHandler_t *modH)
 
         if (modH->EN_Port != NULL)
         {
-            
-            HAL_USART_RXNE_DisableInterrupt(&husart1);
+            //HAL_DelayUs(240);
+            //HAL_USART_RXNE_DisableInterrupt(&husart1);
             //return RS485 transceiver to receive mode
              HAL_GPIO_WritePin(modH->EN_Port, modH->EN_Pin, GPIO_PIN_LOW);
              //HAL_DelayUs(1000);
-             HAL_USART_RXNE_EnableInterrupt(&husart1);
+             //HAL_USART_RXNE_EnableInterrupt(&husart1);
              
             //enable receiver, disable transmitter
 //            HAL_HalfDuplex_EnableReceiver(modH->port);
-
+             //HAL_DelayUs(240);
         }
 
         // set timeout for master query
