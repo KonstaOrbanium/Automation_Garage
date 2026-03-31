@@ -104,30 +104,31 @@ void blink_task(void *pvParameters)
     HAL_USART_IDLE_EnableInterrupt(&husart1);
     HAL_USART_RX_Error_EnableInterrupt(&husart1);
     
-    // HAL_Timer32_Channel_Enable(&htimer32_channel0);
-	// HAL_Timer32_Channel_Enable(&htimer32_channel1);
-	// HAL_Timer32_Channel_Enable(&htimer32_channel2);
-    // HAL_Timer32_Channel_Enable(&htimer32_channel3);
+    HAL_Timer32_Channel_Enable(&htimer32_channel0);
+	HAL_Timer32_Channel_Enable(&htimer32_channel1);
+	HAL_Timer32_Channel_Enable(&htimer32_channel2);
+    HAL_Timer32_Channel_Enable(&htimer32_channel3);
 
-    // HAL_Timer32_Value_Clear(&htimer32_1);
-    // HAL_Timer32_Start(&htimer32_1);
+    HAL_Timer32_Value_Clear(&htimer32_1);
+    HAL_Timer32_Start(&htimer32_1);
 
-    // HAL_Timer32_Channel_OCR_Set(&htimer32_channel0, 0 >> 1);
-    // HAL_Timer32_Channel_OCR_Set(&htimer32_channel1, 0 >> 1);
-    // HAL_Timer32_Channel_OCR_Set(&htimer32_channel2, 0 >> 1);
-    // HAL_Timer32_Channel_OCR_Set(&htimer32_channel3, 0 >> 1);
+    HAL_Timer32_Channel_OCR_Set(&htimer32_channel0, 0 >> 1);
+    HAL_Timer32_Channel_OCR_Set(&htimer32_channel1, 0 >> 1);
+    HAL_Timer32_Channel_OCR_Set(&htimer32_channel2, 0 >> 1);
+    HAL_Timer32_Channel_OCR_Set(&htimer32_channel3, 0 >> 1);
 
-    // HAL_Timer32_Value_Clear(&htimer32_2);
-    // HAL_Timer32_Base_Start_IT(&htimer32_2);
-    //HAL_USART_TXE_EnableInterrupt(&husart1);
+    HAL_Timer32_Value_Clear(&htimer32_2);
+    HAL_Timer32_Base_Start_IT(&htimer32_2);
+    
 
 	ModbusInit(&mHandle);
 
-	// for (;;)
-	// { 
-	//     vTaskDelay(pdMS_TO_TICKS(40));
+	for (;;)
+	{ 
+        HAL_GPIO_TogglePin(GPIO_2, GPIO_PIN_6);
+	    vTaskDelay(pdMS_TO_TICKS(100));
 			
-	// }
+	}
 	vTaskDelete((TaskHandle_t)NULL);
     // for (int i = 0; i < 6; ++i) {
     //             HAL_GPIO_TogglePin(GPIO_2, GPIO_PIN_6);
@@ -153,7 +154,7 @@ int main()
 	//Startup_SPIFI_Config();		///< Для работы с SPIFI
 
     // for (int i = 0; i < 6; ++i) {
-    //             HAL_GPIO_TogglePin(GPIO_1, GPIO_PIN_3);
+    //             HAL_GPIO_TogglePin(GPIO_2, GPIO_PIN_6);
     //             HAL_DelayMs(150);
     //         }
 
@@ -294,7 +295,7 @@ RAM_ATTR void freertos_risc_v_application_interrupt_handler(void) {
         if (HAL_USART_IDLE_ReadFlag(&husart1)) {
             HAL_USART_IDLE_ClearFlag(&husart1);
 
-            //uint8_t buf[] = { 0x01, 0x01, 0x01, 0x00, 0x51, 0x88 };
+            // uint8_t buf[] = { 0x01, 0x01, 0x01, 0x00, 0x51, 0x88 };
 
             // HAL_GPIO_WritePin(USART1_REDE_PORT, USART1_REDE_PIN, GPIO_PIN_HIGH);
             // HAL_USART_Write(&husart1, (char*)buf, 8, 0);
@@ -313,18 +314,18 @@ RAM_ATTR void freertos_risc_v_application_interrupt_handler(void) {
             portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
         }
     }
-    // static uint32_t tickCounter = 0;
-    // if (EPIC_CHECK_TIMER32_2()) {
+    static uint32_t tickCounter = 0;
+    if (EPIC_CHECK_TIMER32_2()) {
      
-    //     if (!(tickCounter % 250)) 
-    //         Automation_Garage_TestProceed();
+        if (!(tickCounter % 250)) 
+            Automation_Garage_TestProceed();
 
-    //     if (!(tickCounter % 10000)) {
-    //         HAL_GPIO_TogglePin(GPIO_2, GPIO_PIN_6);
-    //     }
-    //     tickCounter++;
-    //     HAL_TIMER32_INTERRUPTFLAGS_CLEAR(&htimer32_2);
-    // }  
+        if (!(tickCounter % 10000)) {
+           // HAL_GPIO_TogglePin(GPIO_2, GPIO_PIN_6);
+        }
+        tickCounter++;
+        HAL_TIMER32_INTERRUPTFLAGS_CLEAR(&htimer32_2);
+    }  
     HAL_EPIC_Clear(0xFFFFFFFF);
 }
 

@@ -111,5 +111,4 @@ void Automation_Garage_TestProceed() {
         
         fillFactor += coef;
     }
-    
 }
