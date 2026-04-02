@@ -3,13 +3,13 @@
 #include "mik32_hal_gpio.h"
 
 /* MB FC 1 READ 5 WRITE */
-#define FOG_LIGHT_ADDR          0   ///< Противотуманное освещение 
-#define STOP_LIGHT              1   ///< Стоп-сигнал
-#define TURN_LIGHT              2   ///< Указатель поворота (Включить в режиме стандартный)
-#define REVERSING_LIGHT         3   ///< Задний ход  
-#define PARKING_LIGHT           4   ///< Габарит
-#define STOP_LIGHT_STROBE       5   ///< Стоп-сигнал (Включить в режиме стробоскоп)
-#define TEST_LIGHT              6   ///< Тест 
+#define FOG_LIGHT_ADDR               0       ///< Противотуманное освещение 
+#define STOP_LIGHT                   1       ///< Стоп-сигнал
+#define TURN_LIGHT                   2       ///< Указатель поворота (Включить в режиме стандартный)
+#define REVERSING_LIGHT              3       ///< Задний ход  
+#define PARKING_LIGHT                4       ///< Габарит
+#define STOP_LIGHT_STROBE            5       ///< Стоп-сигнал (Включить в режиме стробоскоп)
+#define TEST_LIGHT                   6       ///< Тест 
 
 
 /* MB FC 3 READ 6 WRITE */
@@ -31,13 +31,13 @@
 
 
 typedef struct {
-    volatile bool fogLight;               ///< Противотуманное освещение 
-    volatile bool stopLight;               ///< Стоп-сигнал
-    volatile bool turnLight;               ///< Указатель поворота (Включить в режиме стандартный)
-    volatile bool reversingLight;          ///< Задний ход  
-    volatile bool parkingLight;            ///< Габарит
-    volatile bool stopLightStrobe;         ///< Стоп-сигнал (Включить в режиме стробоскоп)
-    volatile bool testLight;               ///< Тест 
+    volatile bool fogLight;                    ///< Противотуманное освещение 
+    volatile bool stopLight;                   ///< Стоп-сигнал
+    volatile bool turnLight;                   ///< Указатель поворота (Включить в режиме стандартный)
+    volatile bool reversingLight;              ///< Задний ход  
+    volatile bool parkingLight;                ///< Габарит
+    volatile bool stopLightStrobe;             ///< Стоп-сигнал (Включить в режиме стробоскоп)
+    volatile bool testLight;                   ///< Тест 
 
     volatile uint16_t fogLightBMax;            ///< Противотуманное освещение (Максимальная яркость)
     volatile uint16_t stopLightBMax;           ///< Стоп-сигнал (Максимальная яркость)
