@@ -60,15 +60,15 @@ void Automation_Garage_Sheduler() {
 }
 
 extern TIMER32_HandleTypeDef htimer32_1;
-extern TIMER32_CHANNEL_HandleTypeDef htimer32_channel0;
-extern TIMER32_CHANNEL_HandleTypeDef htimer32_channel1;
-extern TIMER32_CHANNEL_HandleTypeDef htimer32_channel2;
-extern TIMER32_CHANNEL_HandleTypeDef htimer32_channel3;
+extern TIMER32_CHANNEL_HandleTypeDef htimer32_channel0; ///< White
+extern TIMER32_CHANNEL_HandleTypeDef htimer32_channel1; ///< Red (parking and fog)
+extern TIMER32_CHANNEL_HandleTypeDef htimer32_channel2; ///< Red (stop)
+extern TIMER32_CHANNEL_HandleTypeDef htimer32_channel3; ///< Yellow
 
 bool isTestCommand = true;
 
 uint16_t maxChannelsBrightness[] = { 99, 99, 99, 99 };
-TIMER32_CHANNEL_HandleTypeDef *timChannelMas[4] = { NULL, };
+TIMER32_CHANNEL_HandleTypeDef *timChannelMas[4] = { &htimer32_channel0, &htimer32_channel1, &htimer32_channel2, &htimer32_channel3};
 
 uint32_t userPow(uint32_t a, uint32_t b) {
     uint32_t c = a;
@@ -93,11 +93,7 @@ void Automation_Garage_TestProceed() {
     //         isFilledOnce = true;
     //     }
     // }
-    
-    timChannelMas[0] = &htimer32_channel0;
-    timChannelMas[1] = &htimer32_channel1;
-    timChannelMas[2] = &htimer32_channel2;
-    timChannelMas[3] = &htimer32_channel3;
+
 
     bool isTestCommand = false;
     Modbus_Regmap_GetCopyOfItem(TEST_LIGHT, &isTestCommand, sizeof(bool));
@@ -153,13 +149,15 @@ void Automation_Garage_SetBrightness() {
 
 
 void Automation_Garage_SetStopLight() {
-    static uint8_t timeCounter = 0;
+    static uint32_t timeCounter = 0;
     bool defaultValue = false;
     bool strobeValue = false;
-    static uint16_t defaultTimeValue = 5;
+    static uint32_t defaultTimeValue = 5;
     uint16_t timeValue = 0;
     uint32_t parrot = 0;
     uint16_t stopLightMaxBrightness = 0;
+    static uint32_t tickSave = 0;
+    static bool isTimeSaved = false;
 
     Modbus_Regmap_GetCopyOfItem(STOP_LIGHT, &defaultValue, sizeof(bool));
     Modbus_Regmap_GetCopyOfItem(STOP_LIGHT_STROBE, &strobeValue, sizeof(bool));
@@ -171,24 +169,26 @@ void Automation_Garage_SetStopLight() {
     if (timeValue != defaultTimeValue) {
         defaultTimeValue = timeValue;
     }
-
+    
     if (defaultValue && !strobeValue) {
-        HAL_Timer32_Channel_OCR_Set(&htimer32_channel1, (parrot - 1) >> 1);
+        HAL_Timer32_Channel_OCR_Set(&htimer32_channel2, (parrot - 1) >> 1);
     } else if (strobeValue) {
-        if (timeCounter <= (2 * defaultTimeValue)) {
-             if (!(timeCounter & 0x01)) {
-                HAL_Timer32_Channel_OCR_Set(&htimer32_channel1, (parrot - 1) >> 1);
-            } else {
-                HAL_Timer32_Channel_OCR_Set(&htimer32_channel1, 0 >> 1);
-            }
+        if (!isTimeSaved) {
+            tickSave = timeCounter;
+            isTimeSaved = true;
         }
+        if (timeCounter - tickSave >= (uint32_t)10) {
+            isTimeSaved = false; 
+            strobeValue = false;
+            Modbus_Regmap_SetItem(STOP_LIGHT_STROBE, &strobeValue, sizeof(bool));      
+        } 
+        if (!(timeCounter & 0x01)) {
+            HAL_Timer32_Channel_OCR_Set(&htimer32_channel2, (parrot - 1) >> 1);
+        } else {
+            HAL_Timer32_Channel_OCR_Set(&htimer32_channel2, 0 >> 1);
+        }   
     } else {
-        HAL_Timer32_Channel_OCR_Set(&htimer32_channel1, 0 >> 1);
-    }
-    if (timeCounter >= 10) {
-        timeCounter = 0;
-        strobeValue = 0;
-        Modbus_Regmap_SetItem(STOP_LIGHT_STROBE, &strobeValue, sizeof(bool));
+        HAL_Timer32_Channel_OCR_Set(&htimer32_channel2, 0 >> 1);
     }
     timeCounter++;
 }
@@ -209,33 +209,32 @@ void setTurnPointer() {
     Modbus_Regmap_GetCopyOfItem(TURNING_LIGHT_MODE_ADDR, &turnModeValue, sizeof(uint16_t));
     Modbus_Regmap_GetCopyOfItem(TURN_LIGHT_B_MAX_ADDR, &turnLightMaxBrightness, sizeof(uint16_t));
     
-
     if (turnDefaultValue && !turnModeValue) {
-        if (!(secCounter % 10)) {
+        if (!(secCounter % 20)) {
             parrot = htimer32_1.Top * userPow(turnLightMaxBrightness, 2) / 5000;
             if (!isRevertState) {
-                HAL_Timer32_Channel_OCR_Set(&htimer32_channel1, (parrot - 1) >> 1);
+                HAL_Timer32_Channel_OCR_Set(&htimer32_channel3, (parrot - 1) >> 1);
                 isRevertState = true;
             } else {
-                HAL_Timer32_Channel_OCR_Set(&htimer32_channel1, 0 >> 1);
+                HAL_Timer32_Channel_OCR_Set(&htimer32_channel3, 0 >> 1);
                 isRevertState = false;
             }        
         }
     } else if (turnDefaultValue && turnModeValue) {
-        if (secCounter - timeSave >= 10 && isFillDone) {
-            isFillDone = false;
+        if (secCounter - timeSave >= 20 && isFillDone) {
+            isFillDone = false;  
         } else if (!isFillDone) {
             if (fillFactor >= 99) {
                 fillFactor = 2;
                 isFillDone = true;
                 timeSave = secCounter;
-                HAL_Timer32_Channel_OCR_Set(&htimer32_channel1, 0 >> 1);
+                HAL_Timer32_Channel_OCR_Set(&htimer32_channel3, 0 >> 1);
             }
             parrot = htimer32_1.Top * userPow(fillFactor, 2) / 5000;
-            HAL_Timer32_Channel_OCR_Set(&htimer32_channel1, (parrot - 1) >> 1);
+            HAL_Timer32_Channel_OCR_Set(&htimer32_channel3, (parrot - 1) >> 1);
         }
     } else {
-        HAL_Timer32_Channel_OCR_Set(&htimer32_channel1, 0 >> 1);
+        HAL_Timer32_Channel_OCR_Set(&htimer32_channel3, 0 >> 1);
     }
     
     secCounter++;

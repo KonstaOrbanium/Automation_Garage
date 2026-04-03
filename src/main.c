@@ -104,18 +104,18 @@ void blink_task(void *pvParameters)
     HAL_USART_IDLE_EnableInterrupt(&husart1);
     HAL_USART_RX_Error_EnableInterrupt(&husart1);
     
-    HAL_Timer32_Channel_Enable(&htimer32_channel0);
-	HAL_Timer32_Channel_Enable(&htimer32_channel1);
-	HAL_Timer32_Channel_Enable(&htimer32_channel2);
-    HAL_Timer32_Channel_Enable(&htimer32_channel3);
+    // HAL_Timer32_Channel_Enable(&htimer32_channel0);
+	// HAL_Timer32_Channel_Enable(&htimer32_channel1);
+	// HAL_Timer32_Channel_Enable(&htimer32_channel2);
+    // HAL_Timer32_Channel_Enable(&htimer32_channel3);
 
-    HAL_Timer32_Value_Clear(&htimer32_1);
-    HAL_Timer32_Start(&htimer32_1);
+    // HAL_Timer32_Value_Clear(&htimer32_1);
+    // HAL_Timer32_Start(&htimer32_1);
 
-    HAL_Timer32_Channel_OCR_Set(&htimer32_channel0, 0 >> 1);
-    HAL_Timer32_Channel_OCR_Set(&htimer32_channel1, 0 >> 1);
-    HAL_Timer32_Channel_OCR_Set(&htimer32_channel2, 0 >> 1);
-    HAL_Timer32_Channel_OCR_Set(&htimer32_channel3, 0 >> 1);
+    // HAL_Timer32_Channel_OCR_Set(&htimer32_channel0, 0 >> 1);
+    // HAL_Timer32_Channel_OCR_Set(&htimer32_channel1, 0 >> 1);
+    // HAL_Timer32_Channel_OCR_Set(&htimer32_channel2, 0 >> 1);
+    // HAL_Timer32_Channel_OCR_Set(&htimer32_channel3, 0 >> 1);
 
     HAL_Timer32_Value_Clear(&htimer32_2);
     HAL_Timer32_Base_Start_IT(&htimer32_2);
@@ -123,12 +123,12 @@ void blink_task(void *pvParameters)
 
 	ModbusInit(&mHandle);
 
-	for (;;)
-	{ 
-        HAL_GPIO_TogglePin(GPIO_2, GPIO_PIN_6);
-	    vTaskDelay(pdMS_TO_TICKS(100));
+	// for (;;)
+	// { 
+    //     HAL_GPIO_TogglePin(GPIO_2, GPIO_PIN_6);
+	//     vTaskDelay(pdMS_TO_TICKS(100));
 			
-	}
+	// }
 	vTaskDelete((TaskHandle_t)NULL);
     // for (int i = 0; i < 6; ++i) {
     //             HAL_GPIO_TogglePin(GPIO_2, GPIO_PIN_6);
@@ -260,9 +260,7 @@ __attribute__((section(".ram_text"))) void Startup_SPIFI_Config()
     HAL_SPIFI_MemoryMode_Init_LL(&spifi,
                                  0x400FFFFF | SPIFI_CONFIG_CTRL_CACHE_EN_M,
                                  0x90000000, CMD_READ_DATA);
-	
-						 
-								 
+							 
 }
 
 extern void freertos_risc_v_trap_handler();
@@ -316,19 +314,23 @@ RAM_ATTR void freertos_risc_v_application_interrupt_handler(void) {
     }
     static uint32_t tickCounter = 0;
     if (EPIC_CHECK_TIMER32_2()) {
-        if (!(tickCounter % 50)) {
-            Automation_Garage_SetBrightness();
-        }
-        // if (!(tickCounter % 100)) {
+        // if (!(tickCounter % 50)) {
+        //     Automation_Garage_SetBrightness();
+            
+        // }
+        // if (!(tickCounter % 500)) {
         //     setTurnPointer();
+            
         // } 
         
-        if (!(tickCounter % 250)) {
-            Automation_Garage_TestProceed();
-        }       
-        // if (!(tickCounter % 500)) {
-        //     Automation_Garage_SetStopLight();
-        // }
+        // if (!(tickCounter % 250)) {
+        //     Automation_Garage_TestProceed();
+            
+        // }       
+        if (!(tickCounter % 5000)) {
+            Automation_Garage_SetStopLight();
+            HAL_GPIO_TogglePin(GPIO_2, GPIO_PIN_6);
+        }
 
         tickCounter++;
         HAL_TIMER32_INTERRUPTFLAGS_CLEAR(&htimer32_2);
@@ -435,6 +437,6 @@ void USART_Init()
     husart1.Modem.dsr = Disable; //in
     husart1.Modem.ri = Disable;  //in
     husart1.Modem.ddis = Disable;//out
-    husart1.baudrate = 4800;
+    husart1.baudrate = 57600;
     HAL_USART_Init(&husart1);
 }

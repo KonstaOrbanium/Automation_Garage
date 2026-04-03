@@ -27,7 +27,7 @@
 #define NUMBER_OF_SETTINGS      9
 
 
-
+#pragma pack(push, 4)
 
 
 typedef struct {
@@ -57,6 +57,8 @@ typedef union {
 	float f;
 } Modbus_Regmap_UTOF_TypeDef;
 
+
+#pragma pack(pop)
 extern void *Modbus_Regmap_DoStates[NUMBER_OF_OUTPUTS + NUMBER_OF_SETTINGS];
 
  

@@ -1154,7 +1154,7 @@ static void sendTxBuffer(modbusHandler_t *modH)
 #endif
         // transfer buffer to serial line IT
         //    HAL_UART_Transmit_IT(modH->port, modH->u8Buffer, modH->u8BufferSize);
-        HAL_DelayUs(2000);
+       // HAL_DelayUs(2000);
         if (!HAL_USART_Write(&husart1, (char*)mHandlers[0]->u8Buffer, modH->u8BufferSize, 0)) {
             // for (int i = 0; i < 6; ++i) {
             //     HAL_GPIO_TogglePin(GPIO_2, GPIO_PIN_6);
@@ -1163,7 +1163,7 @@ static void sendTxBuffer(modbusHandler_t *modH)
              
         }
         HAL_USART_TXC_ClearFlag(&husart1);
-        HAL_DelayUs(2000);
+        HAL_DelayUs(500);
         
 #if ENABLE_USART_DMA == 1
     	}
@@ -1196,11 +1196,11 @@ static void sendTxBuffer(modbusHandler_t *modH)
 
         if (modH->EN_Port != NULL)
         {
-            HAL_DelayUs(2000);
+            //HAL_DelayUs(2000);
             //HAL_USART_RXNE_DisableInterrupt(&husart1);
             //return RS485 transceiver to receive mode
              HAL_GPIO_WritePin(modH->EN_Port, modH->EN_Pin, GPIO_PIN_LOW);
-             HAL_DelayUs(2000);
+            // HAL_DelayUs(2000);
              //HAL_USART_RXNE_EnableInterrupt(&husart1);
              
             //enable receiver, disable transmitter
