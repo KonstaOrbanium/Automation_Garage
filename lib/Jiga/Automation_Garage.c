@@ -23,11 +23,11 @@ ModbusSettings_TypeDef MbSettings = {
     .testLight           = 0, 
 
     /* Parameters */
-    .fogLightBMax        = 100,         ///< Противотуманное освещение (Максимальная яркость)
-    .stopLightBMax       = 100,         ///< Стоп-сигнал (Максимальная яркость)
-    .turnLightBMax       = 100,         ///< Указатель поворота (Максимальная яркость)
-    .reversingLightBMax  = 100,         ///< Задний ход (Максимальная яркость)
-    .parkingLightBMax    = 50,          ///< Габарит (Максимальная яркость)
+    .fogLightBMax        = 99,         ///< Противотуманное освещение (Максимальная яркость)
+    .stopLightBMax       = 99,         ///< Стоп-сигнал (Максимальная яркость)
+    .turnLightBMax       = 99,         ///< Указатель поворота (Максимальная яркость)
+    .reversingLightBMax  = 99,         ///< Задний ход (Максимальная яркость)
+    .parkingLightBMax    = 99,          ///< Габарит (Максимальная яркость)
     .stopLightStrobeTime = 5,           ///< Стоп-сигнал (Время режима стробоскоп)
     .turningLightMode    = 1,           ///< Указатель поворота (Режим)
     .parkingLightBTime   = 5,           ///< Габарит (Продолжительность изменения яркости)
@@ -68,8 +68,7 @@ extern TIMER32_CHANNEL_HandleTypeDef htimer32_channel3;
 bool isTestCommand = true;
 
 uint16_t maxChannelsBrightness[] = { 99, 99, 99, 99 };
-const uint16_t minChannelsBrightness = 1;
-TIMER32_CHANNEL_HandleTypeDef *timChannelMas[] = { &htimer32_channel0,  &htimer32_channel1, &htimer32_channel2, &htimer32_channel3};
+TIMER32_CHANNEL_HandleTypeDef *timChannelMas[4] = { NULL, };
 
 uint32_t userPow(uint32_t a, uint32_t b) {
     uint32_t c = a;
@@ -83,10 +82,11 @@ uint32_t userPow(uint32_t a, uint32_t b) {
 void Automation_Garage_TestProceed() {
     //static bool isFilledOnce = false;
     int parrot = 0;
-    static int coef = 1;
+    static int coef[] = { 1, 1, 1, 1 };
     static uint16_t fillFactor[] = { 2, 2, 2, 2 };
-    static uint16_t currentIndex = 0;
+    static bool isFillDone[4] = { false, };
     const uint8_t offset = 7U;     ///< Смещение старта нужных адресов фонарей в массиве
+    const uint16_t minChannelsBrightness = 1;
     // if (!isFilledOnce) {
     //     for (int i = 1; i <= sizeof(gammaCorrection) / sizeof(gammaCorrection[0]) - 1; ++i) {
     //         gammaCorrection[i] = htimer32_1.Top * (float)(powf((float)i / 100., 2.2) * 2.);
@@ -94,32 +94,46 @@ void Automation_Garage_TestProceed() {
     //     }
     // }
     
+    timChannelMas[0] = &htimer32_channel0;
+    timChannelMas[1] = &htimer32_channel1;
+    timChannelMas[2] = &htimer32_channel2;
+    timChannelMas[3] = &htimer32_channel3;
+
     bool isTestCommand = false;
     Modbus_Regmap_GetCopyOfItem(TEST_LIGHT, &isTestCommand, sizeof(bool));
-    Modbus_Regmap_GetCopyOfItem(currentIndex + offset, maxChannelsBrightness, sizeof(bool));
-    if (isTestCommand) {
-        if (fillFactor[currentIndex] >= maxChannelsBrightness[currentIndex]) {
-            coef = -1;     
+     if (isTestCommand) {
+        for (uint16_t currentIndex = 0; currentIndex < 4; ++currentIndex) {
+            if (!isFillDone[currentIndex]) {
+                Modbus_Regmap_GetCopyOfItem(currentIndex + offset, &maxChannelsBrightness[currentIndex], sizeof(uint16_t));
+                if (fillFactor[currentIndex] >= maxChannelsBrightness[currentIndex]) {
+                    coef[currentIndex] = -1;     
+                }
+                if (fillFactor[currentIndex] <= minChannelsBrightness) {
+                    coef[currentIndex] = 1;
+                    isFillDone[currentIndex] = true;
+                    if (isFillDone[0] && isFillDone[1] && isFillDone[2] && isFillDone[3]) {
+                        isTestCommand = false;
+                        Modbus_Regmap_SetItem(TEST_LIGHT, &isTestCommand, sizeof(bool));
+                        for (size_t i = 0; i < 4; ++i) {
+                            isFillDone[i] = false;
+                        }
+                    }
+                }
+                //parrot = htimer32_1.Top * fillFactor / 50;
+            // parrot = htimer32_1.Top * (float)(powf((float)fillFactor / 100., 2.2) * 2.);
+                parrot = htimer32_1.Top * userPow(fillFactor[currentIndex], 2) / 5000;
+                //parrot = gammaCorrection[fillFactor <= 1 ? 1 : fillFactor - 1];
+                
+            // HAL_Timer32_Top_Set(&htimer32_1, htimer32_1.Top);
+                HAL_Timer32_Channel_OCR_Set(timChannelMas[currentIndex], (parrot - 1) >> 1);
+                // HAL_Timer32_Channel_OCR_Set(&htimer32_channel1, (parrot - 1) >> 1);
+                // HAL_Timer32_Channel_OCR_Set(&htimer32_channel2, (parrot - 1) >> 1);
+                // HAL_Timer32_Channel_OCR_Set(&htimer32_channel3, (parrot - 1) >> 1);
+                
+                fillFactor[currentIndex] += coef[currentIndex];
+            }     
         }
-        if (fillFactor[currentIndex] <= maxChannelsBrightness[currentIndex]) {
-            coef = 1;
-            isTestCommand = false;
-            Modbus_Regmap_SetItem(TEST_LIGHT, &isTestCommand, sizeof(bool));
-        }
-        //parrot = htimer32_1.Top * fillFactor / 50;
-       // parrot = htimer32_1.Top * (float)(powf((float)fillFactor / 100., 2.2) * 2.);
-        parrot = htimer32_1.Top * userPow(fillFactor[currentIndex], 2) / 5000;
-        //parrot = gammaCorrection[fillFactor <= 1 ? 1 : fillFactor - 1];
-        
-       // HAL_Timer32_Top_Set(&htimer32_1, htimer32_1.Top);
-        HAL_Timer32_Channel_OCR_Set(timChannelMas[currentIndex], (parrot - 1) >> 1);
-        // HAL_Timer32_Channel_OCR_Set(&htimer32_channel1, (parrot - 1) >> 1);
-        // HAL_Timer32_Channel_OCR_Set(&htimer32_channel2, (parrot - 1) >> 1);
-        // HAL_Timer32_Channel_OCR_Set(&htimer32_channel3, (parrot - 1) >> 1);
-        
-        fillFactor[currentIndex] += coef;
     }
-    currentIndex += currentIndex >= 3 ? 0 : 1;
 }
 
 void Automation_Garage_SetBrightness() {
@@ -136,6 +150,7 @@ void Automation_Garage_SetBrightness() {
         Modbus_Regmap_SetItem(currentIndex + offset, &oldValue, sizeof(uint16_t));
     }
 }
+
 
 void Automation_Garage_SetStopLight() {
     static uint8_t timeCounter = 0;
@@ -230,3 +245,4 @@ void setTurnPointer() {
 void setFogLight() {
 
 }
+

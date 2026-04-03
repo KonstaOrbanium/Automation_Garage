@@ -316,18 +316,19 @@ RAM_ATTR void freertos_risc_v_application_interrupt_handler(void) {
     }
     static uint32_t tickCounter = 0;
     if (EPIC_CHECK_TIMER32_2()) {
-        if (!(tickCounter % 100)) {
-            setTurnPointer();
-        } 
-        if (!(tickCounter % 200)) {
+        if (!(tickCounter % 50)) {
             Automation_Garage_SetBrightness();
         }
+        // if (!(tickCounter % 100)) {
+        //     setTurnPointer();
+        // } 
+        
         if (!(tickCounter % 250)) {
             Automation_Garage_TestProceed();
         }       
-        if (!(tickCounter % 500)) {
-            Automation_Garage_SetStopLight();
-        }
+        // if (!(tickCounter % 500)) {
+        //     Automation_Garage_SetStopLight();
+        // }
 
         tickCounter++;
         HAL_TIMER32_INTERRUPTFLAGS_CLEAR(&htimer32_2);
