@@ -6,15 +6,8 @@
 #include "mik32_hal_timer16.h"
 #include "mik32_hal_timer32.h"
 
-#include "FreeRTOS.h"
-
-#include "task.h"
-#include "queue.h"
-
 #include "Modbus.h"
 #include "Modbus_Regmap.h"
-#include "timers.h"
-#include "semphr.h"
 
 
 #ifndef ENABLE_USART_DMA
@@ -186,13 +179,13 @@ void ModbusInit(modbusHandler_t *modH)
 
 #else  
             ModbusStart(modH);
-            modH->queueTaskSlaveHandle = xQueueCreate(50, sizeof(uint8_t));
-            if (!modH->queueTaskSlaveHandle) {
-                return;
-            }               	
-            if (!xTaskCreate(StartTaskModbusSlave, "TaskModbusSlave", 128, modH, tskIDLE_PRIORITY + 1 , NULL)) {
-                    return;
-                }
+            //modH->queueTaskSlaveHandle = xQueueCreate(50, sizeof(uint8_t));
+            // if (!modH->queueTaskSlaveHandle) {
+            //     return;
+            // }               	
+            // if (!xTaskCreate(StartTaskModbusSlave, "TaskModbusSlave", 128, modH, tskIDLE_PRIORITY + 1 , NULL)) {
+            //         return;
+            //     }
       
 #endif
 
@@ -259,14 +252,14 @@ void ModbusInit(modbusHandler_t *modH)
         //     while (1); //Error creating the timer, check heap and stack size
         // }
 
-        modH->ModBusSphrHandle = xSemaphoreCreateBinary();
+       // modH->ModBusSphrHandle = xSemaphoreCreateBinary();
 
-        if (modH->ModBusSphrHandle == NULL)
-        {
-            while (1) {
+        // if (modH->ModBusSphrHandle == NULL)
+        // {
+        //     while (1) {
                 
-            } //Error creating the semaphore, check heap and stack size
-        }
+        //     } //Error creating the semaphore, check heap and stack size
+        // }
 
         mHandlers[numberHandlers] = modH;
         numberHandlers++;
@@ -399,7 +392,7 @@ void ModbusStart(modbusHandler_t *modH)
 #endif
 
 
-void StartTaskModbusSlave(void *argument)
+void StartTaskModbusSlave(void *argument, uint8_t size)
 {
  
   modbusHandler_t *modH = (modbusHandler_t*)argument;
@@ -414,15 +407,15 @@ void StartTaskModbusSlave(void *argument)
 //    }
  
 #endif
-    for (;;)
-    {
-    	uint8_t ulNotificationValue = 0;
+    // for (;;)
+    // {
+    	//uint8_t ulNotificationValue = 0;
         
-        if (xQueueReceive(modH->queueTaskSlaveHandle, &ulNotificationValue, 100) == pdTRUE) {
+        // if (xQueueReceive(modH->queueTaskSlaveHandle, &ulNotificationValue, 100) == pdTRUE) {
             if (1) {
                 if (1) {
                     modH->i8lastError = 0;
-                    memcpy((void*)mHandlers[0]->u8Buffer, (void*)mHandlers[0]->u8RxBuffer, 8);
+                    //memcpy((void*)mHandlers[0]->u8Buffer, (void*)mHandlers[0]->u8RxBuffer, 8);
 #if ENABLE_USB_CDC == 1
 
         if(modH-> xTypeHW == USB_CDC_HW)
@@ -437,22 +430,22 @@ void StartTaskModbusSlave(void *argument)
         }
 #endif
                         
-                    modH->u8BufferSize = ulNotificationValue & 0x000000FF;
-                        
+                    modH->u8BufferSize = size;
+                    
                     modH->u16InCnt++;
                     if (modH->u8BufferSize < 7) {
                         //The size of the frame is invalid
                         modH->i8lastError = ERR_BAD_SIZE;
                         modH->u16errCnt++;
                         //HAL_USART_RXNE_EnableInterrupt(&husart1);
-                        continue;
+                        return;
                     }
                        
                     if (modH->u8Buffer[ID] != modH->u8id)
                     {
 #if ENABLE_TCP == 0      
                         //HAL_USART_RXNE_EnableInterrupt(&husart1);
-                        continue; // continue this is not for us
+                        return; // continue this is not for us
 #else
                         if (modH->xTypeHW != TCP_HW)
                         {
@@ -474,7 +467,7 @@ void StartTaskModbusSlave(void *argument)
                         modH->i8lastError = u8exception;
                         //return u8exception
                         //HAL_USART_RXNE_EnableInterrupt(&husart1);
-                        continue;
+                        return;
                     }
 
                     modH->i8lastError = 0;
@@ -506,11 +499,11 @@ void StartTaskModbusSlave(void *argument)
                                     break;
                     }
 
-                    continue;
+                    return;
                 }
             }
-        }
-    }
+        //}
+    // }
 }
 
 
@@ -529,13 +522,13 @@ void ModbusQuery(modbusHandler_t *modH, modbus_t telegram)
     // }
 }
 
-void ModbusQueryInject(modbusHandler_t *modH, modbus_t telegram)
-{
-    //Add the telegram to the TX head Queue of Modbus
-    xQueueReset(modH->QueueTelegramHandle);
-    //telegram.u32CurrentTask = (uint32_t*) osThreadGetId();
-    xQueueSendToFront(modH->QueueTelegramHandle, &telegram, 0);
-}
+// void ModbusQueryInject(modbusHandler_t *modH, modbus_t telegram)
+// {
+//     //Add the telegram to the TX head Queue of Modbus
+//     xQueueReset(modH->QueueTelegramHandle);
+//     //telegram.u32CurrentTask = (uint32_t*) osThreadGetId();
+//     xQueueSendToFront(modH->QueueTelegramHandle, &telegram, 0);
+// }
 
 #if ENABLE_TCP ==1
 void ModbusCloseConn(struct netconn *conn)
@@ -688,106 +681,106 @@ void ModbusCloseConnNull(modbusHandler_t *modH)
 
 
 
-void StartTaskModbusMaster(void *argument)
-{
+// void StartTaskModbusMaster(void *argument)
+// {
     
-modbusHandler_t* modH = (modbusHandler_t*)argument;
-    uint32_t ulNotificationValue;
-    modbus_t telegram;
+// modbusHandler_t* modH = (modbusHandler_t*)argument;
+//     uint32_t ulNotificationValue;
+//     modbus_t telegram;
 
-    for (;;)
-    {
-        /*Wait indefinitely for a telegram to send */
-        xQueueReceive(modH->QueueTelegramHandle, &telegram, portMAX_DELAY);
+//     for (;;)
+//     {
+//         /*Wait indefinitely for a telegram to send */
+//         xQueueReceive(modH->QueueTelegramHandle, &telegram, portMAX_DELAY);
 
-#if ENABLE_TCP ==1
+// #if ENABLE_TCP ==1
   
-        }
-#else
-     // This is the case for implementations with only USART support
-     SendQuery(modH, telegram);
-     /* Block indefinitely until a Modbus Frame arrives or query timeouts*/
-     ulNotificationValue = ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+//         }
+// #else
+//      // This is the case for implementations with only USART support
+//      SendQuery(modH, telegram);
+//      /* Block indefinitely until a Modbus Frame arrives or query timeouts*/
+//      ulNotificationValue = ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 
-#endif
+// #endif
 
-        // notify the task the request timeout
-        modH->i8lastError = 0;
-        if (ulNotificationValue)
-        {
-            modH->i8state = COM_IDLE;
-            modH->i8lastError = ERR_TIME_OUT;
-            modH->u16errCnt++;
-            xTaskNotify((TaskHandle_t )telegram.u32CurrentTask, modH->i8lastError, eSetValueWithOverwrite);
-            continue;
-        }
+//         // notify the task the request timeout
+//         modH->i8lastError = 0;
+//         if (ulNotificationValue)
+//         {
+//             modH->i8state = COM_IDLE;
+//             modH->i8lastError = ERR_TIME_OUT;
+//             modH->u16errCnt++;
+//             xTaskNotify((TaskHandle_t )telegram.u32CurrentTask, modH->i8lastError, eSetValueWithOverwrite);
+//             continue;
+//         }
 
-#if ENABLE_USB_CDC ==1 || ENABLE_TCP ==1
+// #if ENABLE_USB_CDC ==1 || ENABLE_TCP ==1
 
  
-#else
-      getRxBuffer(modH);
-#endif
+// #else
+//       getRxBuffer(modH);
+// #endif
 
-        if (modH->u8BufferSize < 6)
-        {
+//         if (modH->u8BufferSize < 6)
+//         {
 
-            modH->i8state = COM_IDLE;
-            modH->i8lastError = ERR_BAD_SIZE;
-            modH->u16errCnt++;
-            xTaskNotify((TaskHandle_t )telegram.u32CurrentTask, modH->i8lastError, eSetValueWithOverwrite);
-            continue;
-        }
+//             modH->i8state = COM_IDLE;
+//             modH->i8lastError = ERR_BAD_SIZE;
+//             modH->u16errCnt++;
+//             xTaskNotify((TaskHandle_t )telegram.u32CurrentTask, modH->i8lastError, eSetValueWithOverwrite);
+//             continue;
+//         }
 
-        //xTimerStop(modH->xTimerTimeout, 0); // cancel timeout timer
+//         //xTimerStop(modH->xTimerTimeout, 0); // cancel timeout timer
 
-        // validate message: id, CRC, FCT, exception
-        int8_t u8exception = validateAnswer(modH);
-        if (u8exception != 0)
-        {
-            modH->i8state = COM_IDLE;
-            modH->i8lastError = u8exception;
-            xTaskNotify((TaskHandle_t )telegram.u32CurrentTask, modH->i8lastError, eSetValueWithOverwrite);
-            continue;
-        }
+//         // validate message: id, CRC, FCT, exception
+//         int8_t u8exception = validateAnswer(modH);
+//         if (u8exception != 0)
+//         {
+//             modH->i8state = COM_IDLE;
+//             modH->i8lastError = u8exception;
+//             xTaskNotify((TaskHandle_t )telegram.u32CurrentTask, modH->i8lastError, eSetValueWithOverwrite);
+//             continue;
+//         }
 
-        modH->i8lastError = u8exception;
+//         modH->i8lastError = u8exception;
 
-        xSemaphoreTake(modH->ModBusSphrHandle, portMAX_DELAY); //before processing the message get the semaphore
-        // process answer
-        switch (modH->u8Buffer[FUNC])
-        {
-            case MB_FC_READ_COILS:
-            case MB_FC_READ_DISCRETE_INPUT:
-                //call get_FC1 to transfer the incoming message to u16regs buffer
-                get_FC1(modH);
-                break;
-            case MB_FC_READ_INPUT_REGISTER:
-            case MB_FC_READ_REGISTERS:
-                // call get_FC3 to transfer the incoming message to u16regs buffer
-                get_FC3(modH);
-                break;
-            case MB_FC_WRITE_COIL:
-            case MB_FC_WRITE_REGISTER:
-            case MB_FC_WRITE_MULTIPLE_COILS:
-            case MB_FC_WRITE_MULTIPLE_REGISTERS:
-                // nothing to do
-                break;
-            default:
-                break;
-        }
-        modH->i8state = COM_IDLE;
+//         xSemaphoreTake(modH->ModBusSphrHandle, portMAX_DELAY); //before processing the message get the semaphore
+//         // process answer
+//         switch (modH->u8Buffer[FUNC])
+//         {
+//             case MB_FC_READ_COILS:
+//             case MB_FC_READ_DISCRETE_INPUT:
+//                 //call get_FC1 to transfer the incoming message to u16regs buffer
+//                 get_FC1(modH);
+//                 break;
+//             case MB_FC_READ_INPUT_REGISTER:
+//             case MB_FC_READ_REGISTERS:
+//                 // call get_FC3 to transfer the incoming message to u16regs buffer
+//                 get_FC3(modH);
+//                 break;
+//             case MB_FC_WRITE_COIL:
+//             case MB_FC_WRITE_REGISTER:
+//             case MB_FC_WRITE_MULTIPLE_COILS:
+//             case MB_FC_WRITE_MULTIPLE_REGISTERS:
+//                 // nothing to do
+//                 break;
+//             default:
+//                 break;
+//         }
+//         modH->i8state = COM_IDLE;
 
-        if (modH->i8lastError == 0) // no error the error_OK, we need to use a different value than 0 to detect the timeout
-        {
-            xSemaphoreGive(modH->ModBusSphrHandle); //Release the semaphore
-            xTaskNotify((TaskHandle_t )telegram.u32CurrentTask, ERR_OK_QUERY, eSetValueWithOverwrite);
-        }
+//         if (modH->i8lastError == 0) // no error the error_OK, we need to use a different value than 0 to detect the timeout
+//         {
+//             xSemaphoreGive(modH->ModBusSphrHandle); //Release the semaphore
+//             xTaskNotify((TaskHandle_t )telegram.u32CurrentTask, ERR_OK_QUERY, eSetValueWithOverwrite);
+//         }
 
-        continue;
-    }
+//         continue;
+//     }
 
-}
+// }
 
 /**
  * This method processes functions 1 & 2 (for master)
@@ -1155,7 +1148,7 @@ static void sendTxBuffer(modbusHandler_t *modH)
         // transfer buffer to serial line IT
         //    HAL_UART_Transmit_IT(modH->port, modH->u8Buffer, modH->u8BufferSize);
        // HAL_DelayUs(2000);
-        if (!HAL_USART_Write(&husart1, (char*)mHandlers[0]->u8Buffer, modH->u8BufferSize, 0)) {
+        if (!HAL_USART_Write(&husart1, (char*)mHandlers[0]->u8Buffer, modH->u8BufferSize, 0xFFFFFFFF)) {
             // for (int i = 0; i < 6; ++i) {
             //     HAL_GPIO_TogglePin(GPIO_2, GPIO_PIN_6);
             //     vTaskDelay(pdMS_TO_TICKS(200));

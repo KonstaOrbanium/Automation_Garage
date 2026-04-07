@@ -6,9 +6,6 @@
 #include "mik32_hal_pcc.h"
 #include "mik32_hal_gpio.h"
 
-#include "FreeRTOS.h"
-#include "task.h"
-#include "semphr.h"
 
 #include "Automation_Garage.h"
 
@@ -135,15 +132,14 @@ void Automation_Garage_TestProceed() {
 void Automation_Garage_SetBrightness() {
     static uint16_t oldValue = 0;
     const uint8_t offset = 7U;     ///< Смещение старта нужных адресов фонарей в массиве
-    for (size_t currentIndex = 0; currentIndex < 4; ++currentIndex) {
-        Modbus_Regmap_GetCopyOfItem(currentIndex + offset, &oldValue, sizeof(uint16_t));
+    for (size_t currentIndex = 0; currentIndex < 4; ++currentIndex)  {
+        Modbus_Regmap_GetCopyOfItem(0 + offset, &oldValue, sizeof(uint16_t));
         if (oldValue >= 99) {
             oldValue = 99;
         }
         if (oldValue <= 1) {
             oldValue = 1;
         }
-        Modbus_Regmap_SetItem(currentIndex + offset, &oldValue, sizeof(uint16_t));
     }
 }
 

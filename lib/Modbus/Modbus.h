@@ -5,10 +5,6 @@
 #include "MODBUS_CONFIG.h"
 #include <inttypes.h>
 #include <stdbool.h>
-#include "FreeRTOS.h"
-#include "task.h"
-#include "queue.h"
-#include "timers.h"
 #include "mik32_hal_usart.h"
 #include "mik32_hal_irq.h"
 typedef enum
@@ -190,16 +186,16 @@ typedef struct
 	//FreeRTOS components
 
 	//Queue Modbus Telegram
-	xQueueHandle QueueTelegramHandle;
-    xQueueHandle queueTaskSlaveHandle;
-	//Task Modbus slave
-	xTaskHandle myTaskModbusAHandle;
-	//Timer RX Modbus
-	xTimerHandle xTimerT35;
-	//Timer MasterTimeout
-	xTimerHandle xTimerTimeout;
-	//Semaphore for Modbus data
-	xSemaphoreHandle ModBusSphrHandle;
+	// xQueueHandle QueueTelegramHandle;
+    // xQueueHandle queueTaskSlaveHandle;
+	// //Task Modbus slave
+	// xTaskHandle myTaskModbusAHandle;
+	// //Timer RX Modbus
+	// xTimerHandle xTimerT35;
+	// //Timer MasterTimeout
+	// xTimerHandle xTimerTimeout;
+	// //Semaphore for Modbus data
+	// xSemaphoreHandle ModBusSphrHandle;
 	// RX ring buffer for USART
 	modbusRingBuffer_t xBufferRX;
 	// type of hardware  TCP, USB CDC, USART
@@ -245,7 +241,7 @@ uint16_t getTimeOut(); //!<get communication watch-dog timer value
 bool getTimeOutState(); //!<get communication watch-dog timer state
 void ModbusQuery(modbusHandler_t * modH, modbus_t telegram ); // put a query in the queue tail
 void ModbusQueryInject(modbusHandler_t * modH, modbus_t telegram); //put a query in the queue head
-void StartTaskModbusSlave(void *argument); //slave
+void StartTaskModbusSlave(void *argument, uint8_t size); //slave
 void StartTaskModbusMaster(void *argument); //master
 uint16_t calcCRC(uint8_t *Buffer, uint8_t u8length);
 
