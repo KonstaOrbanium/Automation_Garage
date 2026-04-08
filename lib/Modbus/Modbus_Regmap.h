@@ -61,7 +61,7 @@ typedef union {
 #pragma pack(pop)
 extern void *Modbus_Regmap_DoStates[NUMBER_OF_OUTPUTS + NUMBER_OF_SETTINGS];
 
- 
+int8_t Modbus_Regmap_GetItem(const uint16_t addr, void *pObject, const uint32_t typeSize);
 int8_t Modbus_Regmap_GetCopyOfItem(const uint16_t addr, void  *value, const uint32_t typeSize);
 int8_t Modbus_Regmap_SetItem(const uint16_t addr, void *pObject, const uint32_t typeSize);
-int8_t Modbus_Regmap_InitObject(uint8_t addr, void *pObject);
+int8_t Modbus_Regmap_InitObject(uint16_t addr, void *pObject);

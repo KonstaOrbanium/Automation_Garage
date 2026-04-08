@@ -455,7 +455,8 @@ void StartTaskModbusSlave(void *argument, uint8_t size)
                     }
   
                 // validate message: CRC, FCT, address and size
-                    uint8_t u8exception = validateRequest(modH);
+                    //uint8_t u8exception = validateRequest(modH);
+                    uint8_t u8exception = 0;
                     if (u8exception > 0)															 ///< TODO ????????????????????????????????
                     {
                           
@@ -1148,15 +1149,19 @@ static void sendTxBuffer(modbusHandler_t *modH)
         // transfer buffer to serial line IT
         //    HAL_UART_Transmit_IT(modH->port, modH->u8Buffer, modH->u8BufferSize);
        // HAL_DelayUs(2000);
-        if (!HAL_USART_Write(&husart1, (char*)mHandlers[0]->u8Buffer, modH->u8BufferSize, 0xFFFFFFFF)) {
-            // for (int i = 0; i < 6; ++i) {
-            //     HAL_GPIO_TogglePin(GPIO_2, GPIO_PIN_6);
-            //     vTaskDelay(pdMS_TO_TICKS(200));
-            // }
+        // if (!HAL_USART_Write(&husart1, (char*)mHandlers[0]->u8Buffer, modH->u8BufferSize, 0xFFFFFFFF)) {
+        //     // for (int i = 0; i < 6; ++i) {
+        //     //     HAL_GPIO_TogglePin(GPIO_2, GPIO_PIN_6);
+        //     //     vTaskDelay(pdMS_TO_TICKS(200));
+        //     // }
              
-        }
-        HAL_USART_TXC_ClearFlag(&husart1);
-        HAL_DelayUs(500);
+        // }
+        for (int i = 0; i < modH->u8BufferSize; ++i) {
+            UART_1->TXDATA = mHandlers[0]->u8Buffer[i];
+            HAL_DelayUs(150);
+            //HAL_USART_TXC_ClearFlag(&husart1);
+            UART_1->FLAGS |= UART_FLAGS_TC_M;
+        }   
         
 #if ENABLE_USART_DMA == 1
     	}
@@ -1298,6 +1303,9 @@ static void sendTxBuffer(modbusHandler_t *modH)
 
 }
 
+extern bool Modbus_Regmap_Coils[NUMBER_OF_OUTPUTS];
+
+
 /**
  * @brief
  * This method processes functions 1 & 2
@@ -1346,9 +1354,11 @@ int8_t process_FC1(modbusHandler_t *modH)
             }
             
             bool coilValue = false;
-            if (Modbus_Regmap_GetCopyOfItem(u16currentCoil , &coilValue, sizeof(bool))) {
-                modH->u8Buffer[modH->u8BufferSize] |= (coilValue << u8bitsno);
-            } 
+            // if (Modbus_Regmap_GetCopyOfItem(u16currentCoil , &coilValue, sizeof(bool))) {
+            //     modH->u8Buffer[modH->u8BufferSize] |= (coilValue << u8bitsno);
+            // } 
+            coilValue = Modbus_Regmap_Coils[u16currentCoil];
+            modH->u8Buffer[modH->u8BufferSize] |= (coilValue << u8bitsno);
             u8bitsno++;
             if (u8bitsno > 7) {
                 u8bitsno = 0;
@@ -1372,7 +1382,7 @@ int8_t process_FC1(modbusHandler_t *modH)
     return u8CopyBufferSize;
 }
 
-
+extern uint16_t Modbus_Regmap_Settings[NUMBER_OF_SETTINGS];
 /**
  * @brief
  * This method processes functions 3 & 4
@@ -1391,15 +1401,16 @@ int8_t process_FC3(modbusHandler_t *modH)
     modH->u8BufferSize = 3;
 
     const uint8_t firstAnalogInputOffset = 7U;
-    for (unsigned short currentReg = ((u16StartAdd + firstAnalogInputOffset) % FOG_LIGHT_B_MAX_ADDR); 
-                        currentReg < ((u16StartAdd + firstAnalogInputOffset) % FOG_LIGHT_B_MAX_ADDR) + u8regsno; ++currentReg) {
+    for (unsigned short currentReg = u16StartAdd % FOG_LIGHT_B_MAX_ADDR; 
+                        currentReg < (u16StartAdd % FOG_LIGHT_B_MAX_ADDR) + u8regsno; ++currentReg) {
         uint16_t currentValue = 0;
-        if (Modbus_Regmap_GetCopyOfItem(currentReg, &currentValue, sizeof(uint16_t))) {
-            	modH->u8Buffer[modH->u8BufferSize] = highByte(currentValue);
-				modH->u8BufferSize++;
-				modH->u8Buffer[modH->u8BufferSize] = lowByte(currentValue);
-				modH->u8BufferSize++;
-        }                    
+        //if (Modbus_Regmap_GetCopyOfItem(currentReg, &currentValue, sizeof(uint16_t))) {
+        currentValue = Modbus_Regmap_Settings[currentReg];
+        modH->u8Buffer[modH->u8BufferSize] = highByte(currentValue);
+        modH->u8BufferSize++;
+        modH->u8Buffer[modH->u8BufferSize] = lowByte(currentValue);
+        modH->u8BufferSize++;
+        //}                    
     }
 //    	modH->u8Buffer[modH->u8BufferSize] = highByte(modH->u16regs[i]);
 //    	modH->u8BufferSize++;
@@ -1437,12 +1448,13 @@ int8_t process_FC5(modbusHandler_t *modH)
     //HAL_GPIO_WritePin(TU_PoolsOfTU->poolOfPins[u8currentBit].GPIOx, TU_PoolsOfTU->poolOfPins[u8currentBit].GPIO_Pin, (GPIO_PinState)modH->u8Buffer[NB_HI] == 0xFF);
    
     bool coilValue = modH->u8Buffer[NB_HI] == 0xFF;
-  
-    if (!Modbus_Regmap_SetItem(u16coil , &coilValue, sizeof(bool))) {
+    Modbus_Regmap_Coils[u16coil] = coilValue;
+    // if (!Modbus_Regmap_SetItem(u16coil , &coilValue, sizeof(bool))) {
      
-        //HAL_USART_RXNE_EnableInterrupt(&husart1);
-        return -1;
-    }
+    //     //HAL_USART_RXNE_EnableInterrupt(&husart1);
+    //     return -1;
+    // }
+
     
     // send answer to master
     modH->u8BufferSize = 6;
@@ -1468,11 +1480,11 @@ int8_t process_FC6(modbusHandler_t *modH)
     const uint8_t firstAnalogInputOffset = 7U;
 
  
-    if (!Modbus_Regmap_SetItem((u16add + firstAnalogInputOffset) % FOG_LIGHT_B_MAX_ADDR, (void*)&u16val, sizeof(uint16_t))) {
+    // if (!Modbus_Regmap_SetItem((u16add + firstAnalogInputOffset) % FOG_LIGHT_B_MAX_ADDR, (void*)&u16val, sizeof(uint16_t))) {
         
-        return -1;
-    }
-    
+    //     return -1;
+    // }
+    Modbus_Regmap_Settings[u16add % FOG_LIGHT_B_MAX_ADDR] = u16val;
     // keep the same header
     modH->u8BufferSize = RESPONSE_SIZE;
 
