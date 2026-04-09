@@ -4,6 +4,7 @@
 #include "Modbus.h"
 #include "Modbus_Config.h"
 #include "Automation_Garage.h"
+
 /**
  * @file main.c
  * @brief Пример портирования ОСРВ FreeRTOS для MIK32
@@ -147,12 +148,15 @@ uint32_t getTicks() {
 void togglePin() {
     HAL_GPIO_TogglePin(GPIO_2, GPIO_PIN_6);
 }
-
+extern uint16_t Modbus_Regmap_Settings[NUMBER_OF_SETTINGS];
 Task_TypeDef tasks[] = {
-    { 10, 0, Automation_Garage_TestProceed }, 
+    { 8, 0, Automation_Garage_TestProceed }, 
     { 300, 0, Automation_Garage_SetBrightness },
     { 500, 0, togglePin },
     { 500, 0, Automation_Garage_SetStopLight },
+    { 20, 0, setTurnPointer },
+    { 100, 0, setReverseLight },
+    { 10, 0, setFogLight },
 };
 
 
@@ -202,7 +206,7 @@ int main()
         //     HAL_GPIO_TogglePin(GPIO_2, GPIO_PIN_6);
         // }
 
-        for (int i = 0; i < 4; ++i) {
+        for (int i = 0; i < 7; ++i) {
             if (getTicks() - tasks[i].last >= tasks[i].period) {
                 tasks[i].last += tasks[i].period;
                 tasks[i].handler();
@@ -324,27 +328,10 @@ void trap_handler()
    
         // --- Проверка IDLE (конец кадра) ---
         if (UART_1->FLAGS & UART_FLAGS_IDLE_M) {
-            
-            
-            // uint8_t buf[] = { 0x01, 0x01, 0x01, 0x00, 0x51, 0x88 };
-
-            // HAL_GPIO_WritePin(USART1_REDE_PORT, USART1_REDE_PIN, GPIO_PIN_HIGH);
-            // HAL_USART_Write(&husart1, (char*)buf, 8, 0);
-            // HAL_USART_TXC_ClearFlag(&husart1);
-            // HAL_GPIO_WritePin(USART1_REDE_PORT, USART1_REDE_PIN, GPIO_PIN_LOW);
-            //BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-            //uint8_t size = bufPointer;
             StartTaskModbusSlave(mHandlers[0], bufPointer);
-            // xQueueSendFromISR(
-            //     mHandlers[0]->queueTaskSlaveHandle,
-            //     &size,
-            //     &xHigherPriorityTaskWoken
-            // );
 			
-            bufPointer = 0;
-            //HAL_USART_IDLE_ClearFlag(&husart1);
+            bufPointer = 0;   
             UART_1->FLAGS |= UART_FLAGS_IDLE_M;
-            //portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
         }
     }
     if (EPIC_CHECK_TIMER32_2()) {

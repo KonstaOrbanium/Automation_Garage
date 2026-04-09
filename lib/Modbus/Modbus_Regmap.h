@@ -10,6 +10,7 @@
 #define PARKING_LIGHT                4       ///< Габарит
 #define STOP_LIGHT_STROBE            5       ///< Стоп-сигнал (Включить в режиме стробоскоп)
 #define TEST_LIGHT                   6       ///< Тест 
+#define SAVE_SETTINGS                7       ///< Сохранение параметров 
 
 
 /* MB FC 3 READ 6 WRITE */
@@ -23,7 +24,7 @@
 #define PARKING_LIGHT_B_TIME_ADDR    0x1FB   ///< Габарит (Продолжительность изменения яркости)
 #define TEST_LIGHT_B_TIME_ADDR       0x1FC   ///< Режим тест (Продолжительность изменения яркости)
 
-#define NUMBER_OF_OUTPUTS       7
+#define NUMBER_OF_OUTPUTS       8
 #define NUMBER_OF_SETTINGS      9
 
 

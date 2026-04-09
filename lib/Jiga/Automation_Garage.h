@@ -12,4 +12,5 @@ void Automation_Garage_TestProceed();
 void Automation_Garage_SetBrightness();
 void Automation_Garage_SetStopLight();
 void setTurnPointer();
+void setReverseLight();
 void setFogLight();
