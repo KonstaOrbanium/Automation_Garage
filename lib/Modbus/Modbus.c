@@ -1477,7 +1477,7 @@ int8_t process_FC6(modbusHandler_t *modH)
     uint16_t u16add = word(modH->u8Buffer[ADD_HI], modH->u8Buffer[ADD_LO]);
     uint8_t u8CopyBufferSize;
     uint16_t u16val = word(modH->u8Buffer[NB_HI], modH->u8Buffer[NB_LO]);
-    const uint8_t firstAnalogInputOffset = 7U;
+    //const uint8_t firstAnalogInputOffset = 7U;
 
  
     // if (!Modbus_Regmap_SetItem((u16add + firstAnalogInputOffset) % FOG_LIGHT_B_MAX_ADDR, (void*)&u16val, sizeof(uint16_t))) {

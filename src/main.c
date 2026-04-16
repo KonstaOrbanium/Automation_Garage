@@ -61,23 +61,27 @@ uint32_t tickCounter;
 DMA_InitTypeDef hdma;
 DMA_ChannelHandleTypeDef hdma_ch1;
 
+WDT_HandleTypeDef hwdt;
+
+HAL_EEPROM_HandleTypeDef heeprom;
+
 extern modbusHandler_t mHandle;
 __attribute__((section(".ram_text"))) void Startup_SPIFI_Config();
 // Структура для параметров задачи blink_task.
 typedef struct
 {
-	GPIO_TypeDef *port;	 // Указатель на порт.
-	HAL_PinsTypeDef pin; // Номер пина.
-	uint32_t interval;	 // Период смены состояния в миллисекундах.
+	GPIO_TypeDef *port;	 
+	HAL_PinsTypeDef pin; 
+	uint32_t interval;	 
 } led_config_t;
 
 void SystemClock_Config();
 void GPIO_Init();
 void SPIFI_Init();
 void USART_Init();
+void EEPROM_Init();
 static void Timer32_1_Init();
 static void Timer32_2_Init();
-static void DMA_Init();
 void initFunc();
 
 typedef struct {
@@ -92,10 +96,10 @@ GPIOs_TypeDef flashlights[] = {
 	{_PWM_PORT, _PWM_PIN_3},
 };
 
-
+extern ModbusSettings_TypeDef MbSettings;
 void initFunc()
 {
-	Automation_Garage_InitAllObjects();
+	Auromation_Garage_InitDefaultSettings();
      
     HAL_EPIC_MaskLevelSet(HAL_EPIC_UART_1_MASK | HAL_EPIC_TIMER32_2_MASK); 
     HAL_IRQ_EnableInterrupts();
@@ -122,19 +126,12 @@ void initFunc()
 
 	ModbusInit(&mHandle);
 
-	// for (;;)
-	// { 
-       // HAL_GPIO_TogglePin(GPIO_2, GPIO_PIN_6);
-	   // vTaskDelay(pdMS_TO_TICKS(100));
-			
-	// }
-	//vTaskDelete((TaskHandle_t)NULL);
     // for (int i = 0; i < 6; ++i) {
     //             HAL_GPIO_TogglePin(GPIO_2, GPIO_PIN_6);
     //             HAL_DelayMs(150);
     //         }
 }
-
+extern uint16_t Modbus_Regmap_Settings[NUMBER_OF_SETTINGS];
 typedef struct {
     uint32_t period;
     uint32_t last;
@@ -148,16 +145,7 @@ uint32_t getTicks() {
 void togglePin() {
     HAL_GPIO_TogglePin(GPIO_2, GPIO_PIN_6);
 }
-extern uint16_t Modbus_Regmap_Settings[NUMBER_OF_SETTINGS];
-Task_TypeDef tasks[] = {
-    { 8, 0, Automation_Garage_TestProceed }, 
-    { 300, 0, Automation_Garage_SetBrightness },
-    { 500, 0, togglePin },
-    { 500, 0, Automation_Garage_SetStopLight },
-    { 20, 0, setTurnPointer },
-    { 100, 0, setReverseLight },
-    { 10, 0, setFogLight },
-};
+
 
 
 int main()
@@ -165,53 +153,46 @@ int main()
 	HAL_Init();
 
 	SystemClock_Config();
-    HAL_DelayMs(300);
+    // WDT_Init();
+    // HAL_WDT_Start(&hwdt, WDT_TIMEOUT_DEFAULT);
+    
     
 	Timer32_1_Init();
     Timer32_2_Init();
 	GPIO_Init();
-   
+    
 	USART_Init();
-
+    EEPROM_Init();
 	SPIFI_Init(); 					///< Для работы с QPSIFI
 	//Startup_SPIFI_Config();		///< Для работы с SPIFI
-    DMA_Init();
-
-    // for (int i = 0; i < 6; ++i) {
-    //             HAL_GPIO_TogglePin(GPIO_2, GPIO_PIN_6);
-    //             HAL_DelayMs(150);
-    //         }
 
 	//HAL_GPIO_ClearInterrupts();
   
     initFunc();
 	HAL_EPIC_Clear(0xFFFFFFFF);
 	
-    while (1) {
-        // if (!(tickCounter % 300)) {
-        //     Automation_Garage_SetBrightness();
-        //    // HAL_GPIO_TogglePin(GPIO_2, GPIO_PIN_6);
-        // }
-        // // if (!(tickCounter % 50)) {
-        // //     setTurnPointer();
-            
-        // // } 
-        
-        // if (!(tickCounter % 100)) {
-        //     Automation_Garage_TestProceed();
-            
-        // }       
-        // if (!(tickCounter % 500)) {
-        //     //Automation_Garage_SetStopLight();
-        //     HAL_GPIO_TogglePin(GPIO_2, GPIO_PIN_6);
-        // }
+Task_TypeDef tasks[] = {
+    { 0, 0, Automation_Garage_TestProceed }, 
+    { 300, 0, Automation_Garage_SetBrightness },
+    { 500, 0, togglePin },
+    { 500, 0, Automation_Garage_SetStopLight },
+    { 20, 0, setTurnPointer },
+    { 100, 0, setReverseLight },
+    { 10, 0, setFogLight },
+    { 150, 0, Automation_Garage_SaveSettings},
+     { 80, 0, Automation_Garage_FlashErase },
+};
 
-        for (int i = 0; i < 7; ++i) {
+
+    while (1) {
+       //HAL_WDT_Refresh(&hwdt, WDT_TIMEOUT_DEFAULT);
+        for (int i = 0; i < 9; ++i) {
+            tasks[i].period = i == 0 ? 2 * Modbus_Regmap_Settings[TEST_LIGHT_B_TIME_ADDR % FOG_LIGHT_B_MAX_ADDR] : tasks[i].period;
             if (getTicks() - tasks[i].last >= tasks[i].period) {
                 tasks[i].last += tasks[i].period;
                 tasks[i].handler();
-            }
-        }
+            }  
+        } 
     }
 }
 
@@ -222,15 +203,15 @@ void SystemClock_Config(void)
 	PCC_OscInit.OscillatorEnable = PCC_OSCILLATORTYPE_OSC32M;
 	PCC_OscInit.FreqMon.OscillatorSystem = PCC_OSCILLATORTYPE_OSC32M;
 	PCC_OscInit.FreqMon.ForceOscSys = PCC_FORCE_OSC_SYS_UNFIXED;
-	PCC_OscInit.FreqMon.Force32KClk = PCC_FREQ_MONITOR_SOURCE_OSC32K;
+	PCC_OscInit.FreqMon.Force32KClk = PCC_FREQ_MONITOR_SOURCE_LSI32K;
 	PCC_OscInit.AHBDivider = 0;
 	PCC_OscInit.APBMDivider = 0;
 	PCC_OscInit.APBPDivider = 0;
 	// PCC_OscInit.HSI32MCalibrationValue = 127;
-	// PCC_OscInit.LSI32KCalibrationValue = 8;
-	PCC_OscInit.RTCClockSelection = PCC_RTC_CLOCK_SOURCE_AUTO;
-	PCC_OscInit.RTCClockCPUSelection = PCC_CPU_RTC_CLOCK_SOURCE_OSC32K;
-	HAL_PCC_Config(&PCC_OscInit);
+	PCC_OscInit.LSI32KCalibrationValue = 8;
+	PCC_OscInit.RTCClockSelection = PCC_RTC_CLOCK_SOURCE_LSI32K;
+	PCC_OscInit.RTCClockCPUSelection = PCC_CPU_RTC_CLOCK_SOURCE_LSI32K;
+    HAL_PCC_Config(&PCC_OscInit);
 }
 
 void GPIO_Init()
@@ -240,6 +221,7 @@ void GPIO_Init()
 	__HAL_PCC_GPIO_0_CLK_ENABLE();
 	__HAL_PCC_GPIO_1_CLK_ENABLE();
 	__HAL_PCC_GPIO_2_CLK_ENABLE();
+    //__HAL_PCC_WDT_CLK_ENABLE();
 	//__HAL_PCC_GPIO_IRQ_CLK_ENABLE();
 
 	// Инициализация LED1 и LED2
@@ -252,38 +234,36 @@ void GPIO_Init()
 	GPIO_InitStruct.Pin = USART1_REDE_PIN;
 	HAL_GPIO_Init(USART1_REDE_PORT, &GPIO_InitStruct);
 
-    // GPIO_InitStruct.Pin = GPIO_PIN_0;
-	// HAL_GPIO_Init(GPIO_0, &GPIO_InitStruct);
-
-    // GPIO_InitStruct.Pin = GPIO_PIN_1;
-	// HAL_GPIO_Init(GPIO_0, &GPIO_InitStruct);
-
-    // GPIO_InitStruct.Pin = GPIO_PIN_2;
-	// HAL_GPIO_Init(GPIO_0, &GPIO_InitStruct);
-
-    // GPIO_InitStruct.Pin = GPIO_PIN_3;
-	// HAL_GPIO_Init(GPIO_0, &GPIO_InitStruct);
-
-
-
-	// // Инициализация пользовательской кнопки
-	// GPIO_InitStruct.Pin = BTN_PIN;
-	// GPIO_InitStruct.Mode = HAL_GPIO_MODE_GPIO_INPUT;
-	// HAL_GPIO_Init(BTN_PORT, &GPIO_InitStruct);
-	// HAL_GPIO_InitInterruptLine(BTN_IRQ_LINE_MUX, GPIO_INT_MODE_FALLING);
 }
 
 
-void SPIFI_Init()
-{
-    SPIFI_HandleTypeDef spifi = {
+SPIFI_HandleTypeDef spifi = {
         .Instance = SPIFI_CONFIG, 
         .cacheEnabled = SPIFI_CACHE_ENABLE, 
-        .dataCacheEnabled = SPIFI_DATA_CACHE_DISABLE,
+        .dataCacheEnabled = SPIFI_DATA_CACHE_ENABLE,
     };
+    
+void SPIFI_Init()
+{
     HAL_SPIFI_W25_InitQuadModeFromFlash(&spifi);
 }
 
+uint8_t FLASH_ERASE = 0;
+void EEPROM_Init()
+{
+    heeprom.Instance = EEPROM_REGS;
+    heeprom.Mode = HAL_EEPROM_MODE_TWO_STAGE;
+    heeprom.ErrorCorrection = HAL_EEPROM_ECC_ENABLE;
+    heeprom.EnableInterrupt = HAL_EEPROM_SERR_DISABLE;
+
+    HAL_EEPROM_Init(&heeprom);
+    HAL_EEPROM_CalculateTimings(&heeprom, OSC_SYSTEM_VALUE);
+
+    if (FLASH_ERASE) {
+        const uint8_t pageWords = 32;
+        HAL_EEPROM_Erase(&heeprom, 0, pageWords, HAL_EEPROM_WRITE_ALL, 100000);
+    }
+}
 
 __attribute__((section(".ram_text"))) void Startup_SPIFI_Config()
 {
@@ -316,8 +296,6 @@ void trap_handler()
         // --- Чтение всех пришедших байт ---
         if (UART_1->FLAGS & UART_FLAGS_RXNE_M) { 
             uint8_t byte = 0;
-            //HAL_USART_Receive(&husart1, (char*)&byte, 0xFFFFFFFF);
-            //HAL_DMA_Start(&hdma_ch1, (void*)&UART_1->RXDATA, (void*)&byte, 0);
             byte = (uint8_t)UART_1->RXDATA;
             if (bufPointer < BUFFER_LENGTH) {
                 mHandlers[0]->u8Buffer[bufPointer++] = byte;
@@ -339,7 +317,6 @@ void trap_handler()
         HAL_TIMER32_INTERRUPTFLAGS_CLEAR(&htimer32_2);
     }  
     HAL_EPIC_Clear(EPIC_LINE_UART_1_S | EPIC_LINE_TIMER32_2_S);
-	// freertos_risc_v_trap_handler();
 }
 
 
@@ -401,47 +378,6 @@ static void Timer32_2_Init() {
     HAL_Timer32_Init(&htimer32_2);
 }
 
-
-static void DMA_CH0_Init(DMA_InitTypeDef *hdma)
-{
-    hdma_ch1.dma = hdma;
-
-    /* Настройки канала */
-    hdma_ch1.ChannelInit.Channel = DMA_CHANNEL_1;
-    hdma_ch1.ChannelInit.Priority = DMA_CHANNEL_PRIORITY_VERY_HIGH;
-
-    hdma_ch1.ChannelInit.ReadMode =  DMA_CHANNEL_MODE_PERIPHERY;
-    hdma_ch1.ChannelInit.ReadInc = DMA_CHANNEL_INC_ENABLE;
-    hdma_ch1.ChannelInit.ReadSize = DMA_CHANNEL_SIZE_BYTE; /* data_len должно быть кратно read_size */
-    hdma_ch1.ChannelInit.ReadBurstSize = 0;                /* read_burst_size должно быть кратно read_size */
-    hdma_ch1.ChannelInit.ReadRequest = DMA_CHANNEL_USART_1_REQUEST;
-    hdma_ch1.ChannelInit.ReadAck = DMA_CHANNEL_ACK_DISABLE;
-
-    hdma_ch1.ChannelInit.WriteMode = DMA_CHANNEL_MODE_MEMORY;
-    hdma_ch1.ChannelInit.WriteInc = DMA_CHANNEL_INC_DISABLE;
-    hdma_ch1.ChannelInit.WriteSize = DMA_CHANNEL_SIZE_BYTE; /* data_len должно быть кратно write_size */
-    hdma_ch1.ChannelInit.WriteBurstSize = 0;                /* write_burst_size должно быть кратно read_size */
-    hdma_ch1.ChannelInit.WriteRequest = DMA_CHANNEL_USART_1_REQUEST;
-    hdma_ch1.ChannelInit.WriteAck = DMA_CHANNEL_ACK_ENABLE;
-}
-
-static void DMA_Init()
-{
-
-    /* Настройки DMA */
-    hdma.Instance = DMA_CONFIG;
-    hdma.CurrentValue = DMA_CURRENT_VALUE_ENABLE;
-    if (HAL_DMA_Init(&hdma) != HAL_OK)
-    {
-        
-    }
-
-    /* Инициализация канала */
-    DMA_CH0_Init(&hdma);
-}
-
-
-
 void USART_Init()
 {
     husart1.Instance = UART_1;
@@ -463,7 +399,7 @@ void USART_Init()
     husart1.overwrite = Disable;
     husart1.rts_mode = AlwaysEnable_mode;
     husart1.dma_tx_request = Disable;
-    husart1.dma_rx_request = Enable;
+    husart1.dma_rx_request = Disable;
     husart1.channel_mode = Duplex_Mode;
     husart1.tx_break_mode = Disable;
     husart1.Interrupt.ctsie = Disable;

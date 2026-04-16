@@ -10,8 +10,6 @@
 #define PARKING_LIGHT                4       ///< Габарит
 #define STOP_LIGHT_STROBE            5       ///< Стоп-сигнал (Включить в режиме стробоскоп)
 #define TEST_LIGHT                   6       ///< Тест 
-#define SAVE_SETTINGS                7       ///< Сохранение параметров 
-
 
 /* MB FC 3 READ 6 WRITE */
 #define FOG_LIGHT_B_MAX_ADDR         0x1F4   ///< Противотуманное освещение (Максимальная яркость)
@@ -23,9 +21,12 @@
 #define TURNING_LIGHT_MODE_ADDR      0x1FA   ///< Указатель поворота (Режим)
 #define PARKING_LIGHT_B_TIME_ADDR    0x1FB   ///< Габарит (Продолжительность изменения яркости)
 #define TEST_LIGHT_B_TIME_ADDR       0x1FC   ///< Режим тест (Продолжительность изменения яркости)
+#define SAVE_SETTINGS                0x1FD       ///< Сохранение параметров 
+#define FLASH_ERASE_COMMAND          0x1FE       ///< Сохранение параметров 
 
-#define NUMBER_OF_OUTPUTS       8
-#define NUMBER_OF_SETTINGS      9
+
+#define NUMBER_OF_OUTPUTS       7
+#define NUMBER_OF_SETTINGS      11
 
 
 #pragma pack(push, 4)
@@ -40,6 +41,7 @@ typedef struct {
     volatile bool stopLightStrobe;             ///< Стоп-сигнал (Включить в режиме стробоскоп)
     volatile bool testLight;                   ///< Тест 
 
+
     volatile uint16_t fogLightBMax;            ///< Противотуманное освещение (Максимальная яркость)
     volatile uint16_t stopLightBMax;           ///< Стоп-сигнал (Максимальная яркость)
     volatile uint16_t turnLightBMax;           ///< Указатель поворота (Максимальная яркость)
@@ -49,7 +51,8 @@ typedef struct {
     volatile uint16_t turningLightMode;        ///< Указатель поворота (Режим)
     volatile uint16_t parkingLightBTime;       ///< Габарит (Продолжительность изменения яркости)
     volatile uint16_t testLightBTime;          ///< Режим тест (Продолжительность изменения яркости)
-
+    volatile uint16_t saveCommand;             ///< Сохранене параметров
+    volatile uint16_t flashErase;              ///< Очистка флэш (eeprom)
 }ModbusSettings_TypeDef;
 
 typedef union {

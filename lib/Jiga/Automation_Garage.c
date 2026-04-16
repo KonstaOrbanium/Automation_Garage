@@ -5,9 +5,12 @@
 #include "mik32_hal.h"
 #include "mik32_hal_pcc.h"
 #include "mik32_hal_gpio.h"
-
+#include "mik32_hal_spifi_w25.h"
 
 #include "Automation_Garage.h"
+
+int8_t Automation_Garage_CheckSavedSettings(Automation_Garage_StoredSettings_Typedef *pdefaultSettings, uint32_t size);
+void Automation_Garage_InitAllObjects(Automation_Garage_StoredSettings_Typedef *pdefaultSettings);
 
 ModbusSettings_TypeDef MbSettings = {
     /* DO */
@@ -28,7 +31,7 @@ ModbusSettings_TypeDef MbSettings = {
     .stopLightStrobeTime = 5,           ///< Стоп-сигнал (Время режима стробоскоп)
     .turningLightMode    = 1,           ///< Указатель поворота (Режим)
     .parkingLightBTime   = 5,           ///< Габарит (Продолжительность изменения яркости)
-    .testLightBTime      = 5,           ///< Режим тест (Продолжительность изменения яркости)
+    .testLightBTime      = 4,           ///< Режим тест (Продолжительность изменения яркости)
 };
 
 
@@ -41,6 +44,7 @@ extern TIMER32_CHANNEL_HandleTypeDef htimer32_channel2; ///< Red (stop)
 extern TIMER32_CHANNEL_HandleTypeDef htimer32_channel3; ///< Yellow
 extern bool Modbus_Regmap_Coils[NUMBER_OF_OUTPUTS];
 extern uint16_t Modbus_Regmap_Settings[NUMBER_OF_SETTINGS];
+extern WDT_HandleTypeDef hwdt;
 
 bool isTestCommand = true;
 uint32_t gammaCorrection[99] = { 0 };
@@ -57,24 +61,108 @@ uint32_t userPow(uint32_t a, uint32_t b) {
     return a;
 }
 
-void Automation_Garage_InitAllObjects() {
+void Automation_Garage_InitAllObjects(Automation_Garage_StoredSettings_Typedef *pdefaultSettings) {
     for (int i = FOG_LIGHT_ADDR; i <= TEST_LIGHT; ++i) {
-        Modbus_Regmap_InitObject(i, (void*)(&MbSettings.fogLight + i));
+        Modbus_Regmap_InitObject(i, (void*)(&pdefaultSettings->fogLight + i));
     }
     for (int i = FOG_LIGHT_B_MAX_ADDR; i <= TEST_LIGHT_B_TIME_ADDR; ++i) {
-        Modbus_Regmap_InitObject(i, (void*)(&MbSettings.fogLightBMax + (i % FOG_LIGHT_B_MAX_ADDR)));
+        Modbus_Regmap_InitObject(i, (void*)(&pdefaultSettings->fogLightBMax + (i % FOG_LIGHT_B_MAX_ADDR)));
     }
     for (int i = 1; i <= sizeof(gammaCorrection) / sizeof(gammaCorrection[0]) - 1; ++i) {
         gammaCorrection[i] = htimer32_1.Top * userPow(i, 2) / 5000;          
     }
 }
 
-void Automation_Garage_SaveSettings(ModbusSettings_TypeDef *settings) {
+extern HAL_EEPROM_HandleTypeDef heeprom;
 
+
+void Automation_Garage_SaveSettings() {
+    bool isSaveSettings = false;
+    isSaveSettings = Modbus_Regmap_Settings[SAVE_SETTINGS % FOG_LIGHT_B_MAX_ADDR];
+    Automation_Garage_StoredSettings_Typedef storeSettings = { 0 };
+    if (isSaveSettings) {
+        const uint8_t pageWords = 32;
+        const uint8_t pageCount = 8;
+        isSaveSettings = false;
+        Modbus_Regmap_Settings[SAVE_SETTINGS % FOG_LIGHT_B_MAX_ADDR] = isSaveSettings;
+        for (size_t i = 0; i < NUMBER_OF_OUTPUTS - 1; ++i) {
+            *(&storeSettings.fogLight + i) = Modbus_Regmap_Coils[i];
+        }
+        for (size_t i = 0; i < NUMBER_OF_SETTINGS - 2; ++i) {
+            *(&storeSettings.fogLightBMax + i) = Modbus_Regmap_Settings[i];
+        }    
+        storeSettings.crc = calcCRC((uint8_t*)&storeSettings, sizeof(Automation_Garage_StoredSettings_Typedef) - 2);
+        HAL_EEPROM_Erase(&heeprom, 0, pageWords, HAL_EEPROM_WRITE_ALL, 100000);
+        HAL_EEPROM_Write(&heeprom, 0, (uint32_t*)&storeSettings, pageCount, HAL_EEPROM_WRITE_ALL, 100000);
+    }
 }
 
-int8_t Automation_Garage_CheckSavedSettings() {
+void Automation_Garage_FlashErase() {
+    bool isFlashEraseCommand = false;
+
+    isFlashEraseCommand = Modbus_Regmap_Settings[FLASH_ERASE_COMMAND % FOG_LIGHT_B_MAX_ADDR];
+
+    if (isFlashEraseCommand) {
+        isFlashEraseCommand = false;
+        Modbus_Regmap_Settings[FLASH_ERASE_COMMAND % FOG_LIGHT_B_MAX_ADDR] = isFlashEraseCommand;
+        HAL_EEPROM_Erase(&heeprom, 0, 32, HAL_EEPROM_WRITE_ALL, 100000);
+    }
+    
+}
+
+
+Automation_Garage_StoredSettings_Typedef storedSettings = {
+        /* DO */
+        .fogLight            = 0,           ///< Противотуманное освещение 
+        .stopLight           = 0,           ///< Стоп-сигнал
+        .turnLight           = 0,           ///< Указатель поворота (Включить в режиме стандартный)
+        .reversingLight      = 0,           ///< Задний ход  
+        .parkingLight        = 0,           ///< Габарит
+        .stopLightStrobe     = 0,           ///< Стоп-сигнал (Включить в режиме стробоскоп)
+        .testLight           = 0, 
+        .res                 = 0,
+
+        /* Parameters */
+        .fogLightBMax        = 99,         ///< Противотуманное освещение (Максимальная яркость)
+        .stopLightBMax       = 99,         ///< Стоп-сигнал (Максимальная яркость)
+        .turnLightBMax       = 99,         ///< Указатель поворота (Максимальная яркость)
+        .reversingLightBMax  = 99,         ///< Задний ход (Максимальная яркость)
+        .parkingLightBMax    = 50,          ///< Габарит (Максимальная яркость)
+        .stopLightStrobeTime = 5,           ///< Стоп-сигнал (Время режима стробоскоп)
+        .turningLightMode    = 1,           ///< Указатель поворота (Режим)
+        .parkingLightBTime   = 5,           ///< Габарит (Продолжительность изменения яркости)
+        .testLightBTime      = 5,           ///< Режим тест (Продолжительность изменения яркости)
+        .saveCommand         = 0,
+        .flashErase          = 0,
+        .crc                 = 0,
+    };
+void Auromation_Garage_InitDefaultSettings() {
+    Automation_Garage_CheckSavedSettings(&storedSettings, sizeof(Automation_Garage_StoredSettings_Typedef));
+    Automation_Garage_InitAllObjects(&storedSettings);
+}
+
+int8_t Automation_Garage_CheckSavedSettings(Automation_Garage_StoredSettings_Typedef *pdefaultSettings, uint32_t size) {
     int8_t result = -1;
+ 
+    const uint8_t pageCount = 8;
+
+    
+    //Automation_Garage_StoredSettings_Typedef *pTemp = (Automation_Garage_StoredSettings_Typedef*) malloc(size);
+    Automation_Garage_StoredSettings_Typedef pTemp = { 0 };
+    HAL_EEPROM_Read(&heeprom, 0, (uint32_t*)&pTemp, pageCount, 100000);
+
+     uint16_t indexCRC      = size - 2;
+     uint16_t calculatedCRC = calcCRC((uint8_t*)&pTemp, indexCRC);
+     uint16_t loadedCRC     = pTemp.crc;
+
+     if (loadedCRC != calculatedCRC) {
+        pdefaultSettings->crc = calcCRC((uint8_t*)&pTemp, indexCRC);
+        HAL_EEPROM_Erase(&heeprom, 0, 32, HAL_EEPROM_WRITE_ALL, 100000);
+        HAL_EEPROM_Write(&heeprom, 0, (uint32_t*)pdefaultSettings, 8, HAL_EEPROM_WRITE_ALL, 100000);
+     } else {
+        memcpy((void*)pdefaultSettings, (void*)&pTemp, size);
+     }
+
 
     return result;
 }
@@ -140,7 +228,6 @@ void Automation_Garage_SetBrightness() {
     currentIndex = currentIndex >= 5 ? 0 : currentIndex; 
 }
 
-
 void Automation_Garage_SetStopLight() {
     static uint32_t timeCounter = 0;
     bool defaultValue = false;
@@ -194,7 +281,6 @@ void Automation_Garage_SetStopLight() {
     timeCounter++;
 }
 
-
 void setTurnPointer() {
     bool turnDefaultValue = false;
     uint16_t turnModeValue = 0;
@@ -202,7 +288,7 @@ void setTurnPointer() {
     uint16_t turnLightMaxBrightness = 0;
     static uint32_t secCounter = 0;  ///< 10 тиков - 1 секунда
     static bool isRevertState = false;
-    static uint32_t fillFactor = 0;
+    static uint32_t fillFactor = 2;
     static bool isFillDone = false;
     static uint32_t timeSave = 0;
 
@@ -230,7 +316,7 @@ void setTurnPointer() {
                 isFillDone = false;  
             } else if (!isFillDone) {
                 if (fillFactor >= 97) {
-                    fillFactor = 1;
+                    fillFactor = 2;
                     isFillDone = true;
                     timeSave = secCounter;
                     HAL_Timer32_Channel_OCR_Set(&htimer32_channel0, 0 >> 1);
@@ -242,6 +328,7 @@ void setTurnPointer() {
             }
         } else {
             HAL_Timer32_Channel_OCR_Set(&htimer32_channel0, 0 >> 1);
+            fillFactor = 2;
         }
         secCounter++;
     }
@@ -303,8 +390,7 @@ void setFogLight() {
                 parrot = gammaCorrection[fillFactor];
                 HAL_Timer32_Channel_OCR_Set(&htimer32_channel1, (parrot - 1) >> 1);
                 fillFactor += coef;
-            }
-            
+            }     
         }
     }
 }
