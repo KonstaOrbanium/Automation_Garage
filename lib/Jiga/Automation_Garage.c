@@ -30,7 +30,7 @@ ModbusSettings_TypeDef MbSettings = {
     .parkingLightBMax    = 50,          ///< Габарит (Максимальная яркость)
     .stopLightStrobeTime = 5,           ///< Стоп-сигнал (Время режима стробоскоп)
     .turningLightMode    = 1,           ///< Указатель поворота (Режим)
-    .parkingLightBTime   = 5,           ///< Габарит (Продолжительность изменения яркости)
+    .parkingLightBTime   = 2,           ///< Габарит (Продолжительность изменения яркости)
     .testLightBTime      = 4,           ///< Режим тест (Продолжительность изменения яркости)
 };
 
@@ -50,7 +50,7 @@ bool isTestCommand = true;
 uint32_t gammaCorrection[99] = { 0 };
 
 uint16_t maxChannelsBrightness[] = { 99, 99, 99, 99 };
-TIMER32_CHANNEL_HandleTypeDef *timChannelMas[4] = { &htimer32_channel0, &htimer32_channel1, &htimer32_channel2, &htimer32_channel3};
+TIMER32_CHANNEL_HandleTypeDef *timChannelMas[4] = { &htimer32_channel2, &htimer32_channel1, &htimer32_channel0, &htimer32_channel3};
 
 uint32_t userPow(uint32_t a, uint32_t b) {
     uint32_t c = a;
@@ -68,7 +68,7 @@ void Automation_Garage_InitAllObjects(Automation_Garage_StoredSettings_Typedef *
     for (int i = FOG_LIGHT_B_MAX_ADDR; i <= TEST_LIGHT_B_TIME_ADDR; ++i) {
         Modbus_Regmap_InitObject(i, (void*)(&pdefaultSettings->fogLightBMax + (i % FOG_LIGHT_B_MAX_ADDR)));
     }
-    for (int i = 1; i <= sizeof(gammaCorrection) / sizeof(gammaCorrection[0]) - 1; ++i) {
+    for (int i = 0; i < 99; ++i) {
         gammaCorrection[i] = htimer32_1.Top * userPow(i, 2) / 5000;          
     }
 }
@@ -130,8 +130,8 @@ Automation_Garage_StoredSettings_Typedef storedSettings = {
         .parkingLightBMax    = 50,          ///< Габарит (Максимальная яркость)
         .stopLightStrobeTime = 5,           ///< Стоп-сигнал (Время режима стробоскоп)
         .turningLightMode    = 1,           ///< Указатель поворота (Режим)
-        .parkingLightBTime   = 5,           ///< Габарит (Продолжительность изменения яркости)
-        .testLightBTime      = 5,           ///< Режим тест (Продолжительность изменения яркости)
+        .parkingLightBTime   = 2,           ///< Габарит (Продолжительность изменения яркости)
+        .testLightBTime      = 4,           ///< Режим тест (Продолжительность изменения яркости)
         .saveCommand         = 0,
         .flashErase          = 0,
         .crc                 = 0,
@@ -146,7 +146,7 @@ int8_t Automation_Garage_CheckSavedSettings(Automation_Garage_StoredSettings_Typ
  
     const uint8_t pageCount = 8;
 
-    
+    //int q = (float) i * 0.69 + 30;
     //Automation_Garage_StoredSettings_Typedef *pTemp = (Automation_Garage_StoredSettings_Typedef*) malloc(size);
     Automation_Garage_StoredSettings_Typedef pTemp = { 0 };
     HAL_EEPROM_Read(&heeprom, 0, (uint32_t*)&pTemp, pageCount, 100000);
@@ -236,6 +236,7 @@ void Automation_Garage_SetStopLight() {
     uint16_t timeValue = 0;
     uint32_t parrot = 0;
     uint16_t stopLightMaxBrightness = 0;
+    
     static uint32_t tickSave = 0;
     static bool isTimeSaved = false;
 
@@ -254,7 +255,7 @@ void Automation_Garage_SetStopLight() {
     if (defaultValue && !strobeValue) {
         stopLightMaxBrightness  = Modbus_Regmap_Settings[STOP_LIGHT_B_MAX_ADDR % FOG_LIGHT_B_MAX_ADDR];
         parrot = htimer32_1.Top * userPow(stopLightMaxBrightness, 2) / 5000;
-        HAL_Timer32_Channel_OCR_Set(&htimer32_channel2, (parrot - 1) >> 1);
+        HAL_Timer32_Channel_OCR_Set(&htimer32_channel1, (parrot - 1) >> 1);
     } else if (strobeValue) {
         if (!isTimeSaved) {
             tickSave = timeCounter;
@@ -262,18 +263,20 @@ void Automation_Garage_SetStopLight() {
         }
         if (timeCounter - tickSave >= (timeValue * 2)) {
             //Modbus_Regmap_SetItem(STOP_LIGHT_STROBE, &strobeValue, sizeof(bool));  
-            HAL_Timer32_Channel_OCR_Set(&htimer32_channel2, (parrot - 1) >> 1);
+            stopLightMaxBrightness  = Modbus_Regmap_Settings[STOP_LIGHT_B_MAX_ADDR % FOG_LIGHT_B_MAX_ADDR];
+            parrot = htimer32_1.Top * userPow(stopLightMaxBrightness, 2) / 5000;
+            HAL_Timer32_Channel_OCR_Set(&htimer32_channel1, (parrot - 1) >> 1);
         } else {
                 if (!(timeCounter & 0x01)) {
-                parrot = htimer32_1.Top * userPow(stopLightMaxBrightness, 2) / 5000;
-                HAL_Timer32_Channel_OCR_Set(&htimer32_channel2, (parrot - 1) >> 1);
+                    stopLightMaxBrightness  = Modbus_Regmap_Settings[STOP_LIGHT_B_MAX_ADDR % FOG_LIGHT_B_MAX_ADDR];
+                    parrot = htimer32_1.Top * userPow(stopLightMaxBrightness, 2) / 5000;
+                HAL_Timer32_Channel_OCR_Set(&htimer32_channel1, (parrot - 1) >> 1);
         } else {
-                HAL_Timer32_Channel_OCR_Set(&htimer32_channel2, 0 >> 1);
+                HAL_Timer32_Channel_OCR_Set(&htimer32_channel1, 0 >> 1);
             }  
-        }
-        
+        } 
     } else {
-        HAL_Timer32_Channel_OCR_Set(&htimer32_channel2, 0 >> 1);
+        HAL_Timer32_Channel_OCR_Set(&htimer32_channel1, 0 >> 1);
         isTimeSaved = false; 
         }
     }
@@ -315,7 +318,7 @@ void setTurnPointer() {
             if (secCounter - timeSave >= 50 && isFillDone) {
                 isFillDone = false;  
             } else if (!isFillDone) {
-                if (fillFactor >= 97) {
+                if (fillFactor >= turnLightMaxBrightness) {
                     fillFactor = 2;
                     isFillDone = true;
                     timeSave = secCounter;
@@ -353,7 +356,7 @@ void setReverseLight() {
     
 }
 
-void setFogLight() {
+void setFogLight1() {
     bool isFogLight = false;
     bool isParkingLight = false;
     uint16_t fogLightMaxBrightness = 0;
@@ -368,31 +371,75 @@ void setFogLight() {
         fogLightMaxBrightness     = Modbus_Regmap_Settings[FOG_LIGHT_B_MAX_ADDR % FOG_LIGHT_B_MAX_ADDR];
         parkingLightMaxBrightness = Modbus_Regmap_Settings[PARKING_LIGHT_B_MAX_ADDR % FOG_LIGHT_B_MAX_ADDR];
         if (!isFogLight && isParkingLight) {
-            coef = 1;
+            
             parkingLightMaxBrightness = parkingLightMaxBrightness > 97 ? 97 : parkingLightMaxBrightness;
             if (fillFactor >= parkingLightMaxBrightness) {
                 coef = 0;
-            }
+                fillFactor = 1;
+            } 
             //parrot = htimer32_1.Top * userPow(fillFactor, 2) / 5000;
+           
             parrot = gammaCorrection[fillFactor];
-            HAL_Timer32_Channel_OCR_Set(&htimer32_channel1, (parrot - 1) >> 1);
+          
+            HAL_Timer32_Channel_OCR_Set(&htimer32_channel2, (parrot - 1) >> 1);
+            
             fillFactor += coef;
         } else if (isFogLight) {
             coef = 0;
             parrot = htimer32_1.Top * userPow(fogLightMaxBrightness, 2) / 5000;
-            HAL_Timer32_Channel_OCR_Set(&htimer32_channel1, (parrot - 1) >> 1);    
+            HAL_Timer32_Channel_OCR_Set(&htimer32_channel2, (parrot - 1) >> 1);    
         } else {
             coef = -1;
             if (fillFactor <= 1) {
                 coef = 0;
-                HAL_Timer32_Channel_OCR_Set(&htimer32_channel1, 0 >> 1);
+                HAL_Timer32_Channel_OCR_Set(&htimer32_channel2, 0 >> 1);
             } else {
                 parrot = gammaCorrection[fillFactor];
-                HAL_Timer32_Channel_OCR_Set(&htimer32_channel1, (parrot - 1) >> 1);
+                HAL_Timer32_Channel_OCR_Set(&htimer32_channel2, (parrot - 1) >> 1);
                 fillFactor += coef;
             }     
         }
     }
 }
 
+void setFogLight() {
+    bool isFogLight = false;
+    bool isParkingLight = false;
+    uint16_t fogLightMaxBrightness = 0;
+    uint16_t parkingLightMaxBrightness = 0;
+    uint32_t parrot = 0;
+    static uint8_t fillFactor = 1;
+    static bool isFilledOnce = false;
 
+    if (!Modbus_Regmap_Coils[TEST_LIGHT]) {
+        isFogLight                = Modbus_Regmap_Coils[FOG_LIGHT_ADDR];
+        isParkingLight            = Modbus_Regmap_Coils[PARKING_LIGHT];
+        fogLightMaxBrightness     = Modbus_Regmap_Settings[FOG_LIGHT_B_MAX_ADDR % FOG_LIGHT_B_MAX_ADDR];
+        parkingLightMaxBrightness = Modbus_Regmap_Settings[PARKING_LIGHT_B_MAX_ADDR % FOG_LIGHT_B_MAX_ADDR];
+
+        if (!isFogLight && !isParkingLight) {
+            isFilledOnce = false;
+            if (fillFactor > 1) {
+                parrot = gammaCorrection[fillFactor];
+                HAL_Timer32_Channel_OCR_Set(&htimer32_channel2, (parrot - 1) >> 1);
+                fillFactor--;
+            } else {
+                HAL_Timer32_Channel_OCR_Set(&htimer32_channel2, 0 >> 1);
+            }
+        } else if (!isFogLight && isParkingLight) {
+            if (fillFactor <= parkingLightMaxBrightness && !isFilledOnce) {
+                parrot = gammaCorrection[fillFactor];
+                HAL_Timer32_Channel_OCR_Set(&htimer32_channel2, (parrot - 1) >> 1);
+                fillFactor++;
+            } else {
+                isFilledOnce = true;
+                fillFactor = parkingLightMaxBrightness;
+                parrot = htimer32_1.Top * userPow(parkingLightMaxBrightness, 2) / 5000;
+                HAL_Timer32_Channel_OCR_Set(&htimer32_channel2, (parrot - 1) >> 1);
+            }
+        } else if (isFogLight) {
+            parrot = htimer32_1.Top * userPow(fogLightMaxBrightness, 2) / 5000;
+            HAL_Timer32_Channel_OCR_Set(&htimer32_channel2, (parrot - 1) >> 1); 
+        }
+    }
+}

@@ -178,9 +178,9 @@ Task_TypeDef tasks[] = {
     { 500, 0, Automation_Garage_SetStopLight },
     { 20, 0, setTurnPointer },
     { 100, 0, setReverseLight },
-    { 10, 0, setFogLight },
+    { 0, 0, setFogLight },
     { 150, 0, Automation_Garage_SaveSettings},
-     { 80, 0, Automation_Garage_FlashErase },
+    { 80, 0, Automation_Garage_FlashErase },
 };
 
 
@@ -188,6 +188,7 @@ Task_TypeDef tasks[] = {
        //HAL_WDT_Refresh(&hwdt, WDT_TIMEOUT_DEFAULT);
         for (int i = 0; i < 9; ++i) {
             tasks[i].period = i == 0 ? 2 * Modbus_Regmap_Settings[TEST_LIGHT_B_TIME_ADDR % FOG_LIGHT_B_MAX_ADDR] : tasks[i].period;
+            tasks[i].period = i == 6 ? 25 * Modbus_Regmap_Settings[PARKING_LIGHT_B_TIME_ADDR % FOG_LIGHT_B_MAX_ADDR] : tasks[i].period;
             if (getTicks() - tasks[i].last >= tasks[i].period) {
                 tasks[i].last += tasks[i].period;
                 tasks[i].handler();
