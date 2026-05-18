@@ -171,12 +171,12 @@ int main()
     initFunc();
 	HAL_EPIC_Clear(0xFFFFFFFF);
 	
-Task_TypeDef tasks[] = {
+Task_TypeDef tasks[] = { 
     { 0, 0, Automation_Garage_TestProceed }, 
     { 300, 0, Automation_Garage_SetBrightness },
-    { 500, 0, togglePin },
-    { 500, 0, Automation_Garage_SetStopLight },
-    { 20, 0, setTurnPointer },
+    { 10000, 0, togglePin },
+    { 5000, 0, Automation_Garage_SetStopLight },
+    { 12, 0, setTurnPointer },
     { 100, 0, setReverseLight },
     { 0, 0, setFogLight },
     { 150, 0, Automation_Garage_SaveSettings},
@@ -184,16 +184,41 @@ Task_TypeDef tasks[] = {
 };
 
 
-    while (1) {
-       //HAL_WDT_Refresh(&hwdt, WDT_TIMEOUT_DEFAULT);
-        for (int i = 0; i < 9; ++i) {
-            tasks[i].period = i == 0 ? 2 * Modbus_Regmap_Settings[TEST_LIGHT_B_TIME_ADDR % FOG_LIGHT_B_MAX_ADDR] : tasks[i].period;
-            tasks[i].period = i == 6 ? 25 * Modbus_Regmap_Settings[PARKING_LIGHT_B_TIME_ADDR % FOG_LIGHT_B_MAX_ADDR] : tasks[i].period;
-            if (getTicks() - tasks[i].last >= tasks[i].period) {
-                tasks[i].last += tasks[i].period;
+    while (1)
+    {
+        uint32_t now = getTicks();
+
+        for (int i = 0; i < 9; ++i)
+        {
+            uint32_t currentPeriod = tasks[i].period;
+
+            if (i == 0)
+            {
+                currentPeriod =
+                    8 * Modbus_Regmap_Settings[
+                        TEST_LIGHT_B_TIME_ADDR % FOG_LIGHT_B_MAX_ADDR
+                    ];
+            }
+
+            if (i == 6)
+            {
+                currentPeriod =
+                    8 * Modbus_Regmap_Settings[
+                        PARKING_LIGHT_B_TIME_ADDR % FOG_LIGHT_B_MAX_ADDR
+                    ];
+            }
+
+            if (currentPeriod == 0)
+            {
+                currentPeriod = 1;
+            }
+
+            if (now - tasks[i].last >= currentPeriod)
+            {
+                tasks[i].last = now;
                 tasks[i].handler();
-            }  
-        } 
+            }
+        }
     }
 }
 
@@ -354,7 +379,7 @@ static void Timer32_1_Init() {
     htimer32_channel2.PWM_Invert = TIMER32_CHANNEL_INVERTED_PWM;
     htimer32_channel2.Mode = TIMER32_CHANNEL_MODE_PWM;
     htimer32_channel2.CaptureEdge = TIMER32_CHANNEL_CAPTUREEDGE_RISING;
-    htimer32_channel2.OCR = (6400 - 1) >> 1;
+    htimer32_channel2.OCR = (6400 - 1) >> 1; 
     htimer32_channel2.Noise = TIMER32_CHANNEL_FILTER_OFF;
     HAL_Timer32_Channel_Init(&htimer32_channel2);
 
@@ -373,7 +398,7 @@ static void Timer32_2_Init() {
     htimer32_2.Top = 32 - 1;
     htimer32_2.State = TIMER32_STATE_DISABLE;
     htimer32_2.Clock.Source = TIMER32_SOURCE_PRESCALER;
-    htimer32_2.Clock.Prescaler = 1000 - 1;
+    htimer32_2.Clock.Prescaler = 100 - 1;
     htimer32_2.InterruptMask = 0;
     htimer32_2.CountMode = TIMER32_COUNTMODE_FORWARD;
     HAL_Timer32_Init(&htimer32_2);
